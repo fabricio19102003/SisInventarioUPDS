@@ -1,0 +1,32 @@
+{
+  "name": "sis-inventario-upds",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema de Control de Inventarios - Universidad Privada Domingo Savio (UPDS)",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@upds/web",
+    "dev:admin": "turbo run dev --filter=@upds/admin",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:generate": "turbo run db:generate --filter=@upds/db",
+    "db:push": "turbo run db:push --filter=@upds/db",
+    "db:migrate": "turbo run db:migrate --filter=@upds/db",
+    "db:seed": "turbo run db:seed --filter=@upds/db",
+    "db:studio": "turbo run db:studio --filter=@upds/db",
+    "clean": "turbo run clean && rimraf node_modules .turbo",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}

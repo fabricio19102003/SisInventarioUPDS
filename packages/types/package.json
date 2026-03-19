@@ -1,0 +1,22 @@
+{
+  "name": "@upds/types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tipos TypeScript compartidos del sistema de inventario",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf node_modules .turbo dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "rimraf": "^6.0.1"
+  }
+}

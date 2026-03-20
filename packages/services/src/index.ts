@@ -1,0 +1,30 @@
+// @upds/services — Logica de negocio pura
+
+// Auditoria
+export { createAuditLog, diffValues } from "./audit";
+export type {
+  DbClient,
+  AuditAction,
+  AuditEntityType,
+  CreateAuditLogParams,
+} from "./audit";
+
+// Auth (usuarios)
+export { AuthService } from "./auth";
+export type { SafeUser, ServiceResult, AuditContext } from "./auth";
+
+// Productos y variantes
+export { ProductService } from "./product";
+export type { ProductData, ProductVariantData, LowStockAlert } from "./product";
+
+// Fabricantes
+export { ManufacturerService } from "./manufacturer";
+export type { ManufacturerData } from "./manufacturer";
+
+// Destinatarios/Beneficiarios
+export { RecipientService } from "./recipient";
+export type { RecipientData } from "./recipient";
+
+// Departamentos
+export { DepartmentService } from "./department";
+export type { DepartmentData } from "./department";

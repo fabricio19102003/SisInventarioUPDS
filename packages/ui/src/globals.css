@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * ═══════════════════════════════════════════════════════════
+   * Tema Claro — Colores institucionales UPDS
+   *
+   * Paleta:
+   *   Azul Marino  #002B5C  →  hsl(213, 100%, 18%)
+   *   Celeste       #4A90D9  →  hsl(214, 63%, 57%)
+   *   Azul Claro   #A3C4F3  →  hsl(216, 79%, 80%)
+   *   Blanco        #FFFFFF  →  hsl(0, 0%, 100%)
+   * ═══════════════════════════════════════════════════════════
+   */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 213 100% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 100% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 100% 18%;
+
+    --primary: 213 100% 18%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 216 79% 80%;
+    --secondary-foreground: 213 100% 18%;
+
+    --muted: 216 30% 95%;
+    --muted-foreground: 213 30% 40%;
+
+    --accent: 214 63% 57%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 216 30% 88%;
+    --input: 216 30% 88%;
+    --ring: 214 63% 57%;
+
+    --radius: 0.5rem;
+  }
+
+  /*
+   * ═══════════════════════════════════════════════════════════
+   * Tema Oscuro — Inversión sobre la paleta UPDS
+   * ═══════════════════════════════════════════════════════════
+   */
+  .dark {
+    --background: 213 80% 8%;
+    --foreground: 216 30% 95%;
+
+    --card: 213 70% 12%;
+    --card-foreground: 216 30% 95%;
+
+    --popover: 213 70% 12%;
+    --popover-foreground: 216 30% 95%;
+
+    --primary: 214 63% 57%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 213 60% 20%;
+    --secondary-foreground: 216 30% 95%;
+
+    --muted: 213 50% 16%;
+    --muted-foreground: 216 20% 60%;
+
+    --accent: 216 79% 80%;
+    --accent-foreground: 213 100% 18%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 213 40% 20%;
+    --input: 213 40% 20%;
+    --ring: 214 63% 57%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}

@@ -18,12 +18,15 @@
   },
   "dependencies": {
     "@upds/db": "workspace:*",
-    "@upds/validators": "workspace:*",
     "@upds/types": "workspace:*",
+    "@upds/validators": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "rimraf": "^6.0.1"
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^22.10.5",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
   }
 }

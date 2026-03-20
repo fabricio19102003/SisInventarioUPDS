@@ -1,0 +1,423 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// UPDS Inventory System — Prisma Schema
+// Sistema de Control de Inventarios - Universidad Privada Domingo Savio
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Convenciones:
+//   - snake_case para tablas y campos (estandar PostgreSQL)
+//   - UUID v4 como primary key
+//   - Soft delete via is_active (nunca borrado fisico)
+//   - Timestamps created_at / updated_at en toda entidad mutable
+//   - Indices explicitos en campos de busqueda frecuente
+// ═══════════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Roles del sistema. DENY por defecto — solo se permite lo explicitamente listado.
+enum UserRole {
+  ADMIN
+  INVENTORY_MANAGER
+  VIEWER
+}
+
+/// Categoria de producto: indumentaria medica o material de oficina.
+enum ProductCategory {
+  MEDICAL_GARMENT
+  OFFICE_SUPPLY
+}
+
+/// Tipo de prenda medica. Solo aplica cuando category = MEDICAL_GARMENT.
+enum GarmentType {
+  PIJAMA
+  BATA
+  MANDIL
+  POLERA
+  GORRO
+}
+
+/// Tallas disponibles para indumentaria medica.
+enum Size {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+}
+
+/// Genero de la prenda. Solo aplica a indumentaria medica.
+enum Gender {
+  MASCULINO
+  FEMENINO
+  UNISEX
+}
+
+/// Area fisica del almacen. Un solo almacen, dos sectores.
+enum WarehouseArea {
+  MEDICAL
+  OFFICE
+}
+
+/// Tipo de movimiento de inventario. Cada tipo tiene reglas especificas.
+enum MovementType {
+  ENTRY
+  SALE
+  DONATION
+  WRITE_OFF
+  ADJUSTMENT
+  DEPARTMENT_DELIVERY
+}
+
+/// Estado del ciclo de vida de un movimiento.
+/// DRAFT -> CONFIRMED (irreversible) | DRAFT -> CANCELLED (requiere motivo).
+enum MovementStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+/// Estado del ciclo de vida de una orden de fabricacion.
+/// PENDING -> IN_PROGRESS -> COMPLETED | PENDING/IN_PROGRESS -> CANCELLED.
+enum ManufactureOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// Tipo de destinatario/beneficiario.
+/// SCHOLAR es obligatorio para DONATION; STUDENT/STAFF para SALE.
+enum RecipientType {
+  STUDENT
+  STAFF
+  SCHOLAR
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODELOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Usuarios del sistema con autenticacion y roles.
+/// Procesa movimientos y genera entradas en audit_log.
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique @db.VarChar(255)
+  password_hash String    @db.VarChar(255)
+  full_name     String    @db.VarChar(255)
+  role          UserRole  @default(VIEWER)
+  is_active     Boolean   @default(true)
+  last_login_at DateTime? @db.Timestamptz
+  created_at    DateTime  @default(now()) @db.Timestamptz
+  updated_at    DateTime  @updatedAt @db.Timestamptz
+
+  // Relaciones
+  inventory_movements InventoryMovement[]
+  audit_logs          AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@index([is_active])
+  @@map("users")
+}
+
+/// Producto base (ej: "Pijama Quirurgico", "Resma A4").
+/// El stock NO vive aqui — vive en ProductVariant.
+/// Campos inmutables post-creacion: sku, category, garment_type, warehouse_area.
+model Product {
+  id             String          @id @default(uuid()) @db.Uuid
+  sku            String          @unique @db.VarChar(50)
+  name           String          @db.VarChar(255)
+  description    String?         @db.Text
+  category       ProductCategory
+  garment_type   GarmentType?
+  warehouse_area WarehouseArea
+  min_stock      Int             @default(5)
+  is_active      Boolean         @default(true)
+  created_at     DateTime        @default(now()) @db.Timestamptz
+  updated_at     DateTime        @updatedAt @db.Timestamptz
+
+  // Relaciones
+  variants ProductVariant[]
+
+  @@index([category])
+  @@index([warehouse_area])
+  @@index([is_active])
+  @@index([garment_type])
+  @@index([name])
+  @@map("products")
+}
+
+/// Variante especifica de un producto (talla + genero + color).
+/// Para MEDICAL_GARMENT: N variantes por producto (cada combinacion).
+/// Para OFFICE_SUPPLY: 1 variante con size, gender y color en null.
+/// El current_stock siempre vive aqui, nunca en Product.
+/// Campos inmutables post-creacion: size, gender, sku_suffix.
+model ProductVariant {
+  id            String   @id @default(uuid()) @db.Uuid
+  product_id    String   @db.Uuid
+  sku_suffix    String   @db.VarChar(50)
+  size          Size?
+  gender        Gender?
+  color         String?  @db.VarChar(100)
+  current_stock Int      @default(0)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz
+  updated_at    DateTime @updatedAt @db.Timestamptz
+
+  // Relaciones
+  product                 Product                @relation(fields: [product_id], references: [id])
+  movement_items          MovementItem[]
+  manufacture_order_items ManufactureOrderItem[]
+
+  // Constraint: SKU compuesto unico (producto + sufijo)
+  @@unique([product_id, sku_suffix])
+  @@index([product_id])
+  @@index([is_active])
+  @@index([current_stock])
+  @@map("product_variants")
+}
+
+/// Taller o fabricante externo de indumentaria medica.
+/// La indumentaria se manda a fabricar, no se compra a proveedores.
+model Manufacturer {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(255)
+  contact_name String?  @db.VarChar(255)
+  phone        String?  @db.VarChar(50)
+  email        String?  @db.VarChar(255)
+  address      String?  @db.Text
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz
+  updated_at   DateTime @updatedAt @db.Timestamptz
+
+  // Relaciones
+  manufacture_orders ManufactureOrder[]
+
+  @@index([name])
+  @@index([is_active])
+  @@map("manufacturers")
+}
+
+/// Orden de fabricacion enviada a un taller externo.
+/// Soporta recepcion parcial (multiples entregas por orden).
+/// Ciclo: PENDING -> IN_PROGRESS -> COMPLETED | CANCELLED.
+model ManufactureOrder {
+  id              String                 @id @default(uuid()) @db.Uuid
+  order_number    String                 @unique @db.VarChar(50)
+  manufacturer_id String                 @db.Uuid
+  status          ManufactureOrderStatus @default(PENDING)
+  notes           String?                @db.Text
+  cancel_reason   String?                @db.Text
+  ordered_at      DateTime               @default(now()) @db.Timestamptz
+  expected_at     DateTime?              @db.Timestamptz
+  completed_at    DateTime?              @db.Timestamptz
+  cancelled_at    DateTime?              @db.Timestamptz
+  created_at      DateTime               @default(now()) @db.Timestamptz
+  updated_at      DateTime               @updatedAt @db.Timestamptz
+
+  // Relaciones
+  manufacturer        Manufacturer           @relation(fields: [manufacturer_id], references: [id])
+  items               ManufactureOrderItem[]
+  inventory_movements InventoryMovement[]
+
+  @@index([manufacturer_id])
+  @@index([status])
+  @@index([ordered_at])
+  @@map("manufacture_orders")
+}
+
+/// Linea de detalle de una orden de fabricacion.
+/// quantity_received se incrementa con cada recepcion parcial.
+/// No se puede recibir mas de lo ordenado: received + nueva <= ordered.
+model ManufactureOrderItem {
+  id                   String   @id @default(uuid()) @db.Uuid
+  manufacture_order_id String   @db.Uuid
+  product_variant_id   String   @db.Uuid
+  quantity_ordered     Int
+  quantity_received    Int      @default(0)
+  unit_cost            Decimal  @default(0) @db.Decimal(12, 2)
+  created_at           DateTime @default(now()) @db.Timestamptz
+  updated_at           DateTime @updatedAt @db.Timestamptz
+
+  // Relaciones
+  manufacture_order ManufactureOrder @relation(fields: [manufacture_order_id], references: [id])
+  product_variant   ProductVariant   @relation(fields: [product_variant_id], references: [id])
+
+  @@unique([manufacture_order_id, product_variant_id])
+  @@index([manufacture_order_id])
+  @@index([product_variant_id])
+  @@map("manufacture_order_items")
+}
+
+/// Persona que recibe productos: estudiante (STUDENT), personal (STAFF) o becario (SCHOLAR).
+/// Destinatario de ventas (SALE) y dotaciones (DONATION).
+/// Campo inmutable post-creacion: document_number.
+model Recipient {
+  id              String        @id @default(uuid()) @db.Uuid
+  document_number String        @unique @db.VarChar(50)
+  full_name       String        @db.VarChar(255)
+  type            RecipientType
+  phone           String?       @db.VarChar(50)
+  email           String?       @db.VarChar(255)
+  career          String?       @db.VarChar(255)
+  is_active       Boolean       @default(true)
+  created_at      DateTime      @default(now()) @db.Timestamptz
+  updated_at      DateTime      @updatedAt @db.Timestamptz
+
+  // Relaciones
+  inventory_movements InventoryMovement[]
+
+  @@index([document_number])
+  @@index([type])
+  @@index([is_active])
+  @@index([full_name])
+  @@map("recipients")
+}
+
+/// Departamento interno de la universidad.
+/// Destinatario exclusivo de entregas de material de oficina (DEPARTMENT_DELIVERY).
+model Department {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @unique @db.VarChar(255)
+  code       String   @unique @db.VarChar(20)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  // Relaciones
+  inventory_movements InventoryMovement[]
+
+  @@index([is_active])
+  @@map("departments")
+}
+
+/// Cabecera de movimiento de inventario — CORAZON DEL SISTEMA.
+/// Toda operacion que afecte stock pasa por aqui. Sin excepciones.
+///
+/// Ciclo de vida:
+///   DRAFT -> CONFIRMED (afecta stock, irreversible)
+///   DRAFT -> CANCELLED (no afecta stock, requiere reason)
+///
+/// Referencias contextuales segun movement_type:
+///   ENTRY              -> manufacture_order_id (obligatorio)
+///   SALE               -> recipient_id (obligatorio, tipo STUDENT/STAFF)
+///   DONATION           -> recipient_id (obligatorio, tipo SCHOLAR)
+///   WRITE_OFF          -> sin referencias, notes obligatorio
+///   ADJUSTMENT         -> sin referencias, notes obligatorio
+///   DEPARTMENT_DELIVERY -> department_id (obligatorio)
+model InventoryMovement {
+  id              String         @id @default(uuid()) @db.Uuid
+  movement_number String         @unique @db.VarChar(50)
+  movement_type   MovementType
+  status          MovementStatus @default(DRAFT)
+  is_donated      Boolean        @default(false)
+  total_amount    Decimal        @default(0) @db.Decimal(12, 2)
+  notes           String?        @db.Text
+  cancel_reason   String?        @db.Text
+
+  // Referencias contextuales (nullable segun tipo)
+  recipient_id         String? @db.Uuid
+  department_id        String? @db.Uuid
+  manufacture_order_id String? @db.Uuid
+
+  // Usuario que procesa el movimiento
+  processed_by String @db.Uuid
+
+  // Timestamps del ciclo de vida
+  processed_at DateTime? @db.Timestamptz
+  cancelled_at DateTime? @db.Timestamptz
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+
+  // Relaciones
+  recipient         Recipient?        @relation(fields: [recipient_id], references: [id])
+  department        Department?       @relation(fields: [department_id], references: [id])
+  manufacture_order ManufactureOrder? @relation(fields: [manufacture_order_id], references: [id])
+  processed_by_user User              @relation(fields: [processed_by], references: [id])
+  items             MovementItem[]
+
+  // Indices para queries frecuentes y reportes
+  @@index([movement_type])
+  @@index([status])
+  @@index([processed_by])
+  @@index([recipient_id])
+  @@index([department_id])
+  @@index([manufacture_order_id])
+  @@index([processed_at])
+  @@index([is_donated])
+  // Indices compuestos optimizados para reportes
+  @@index([movement_type, status, processed_at])
+  @@index([movement_type, is_donated, processed_at])
+  @@index([movement_type, status, is_donated])
+  @@map("inventory_movements")
+}
+
+/// Linea de detalle de un movimiento de inventario.
+/// Cada item referencia una variante especifica y su cantidad/precio.
+///
+/// Reglas por tipo de movimiento:
+///   SALE               -> unit_price > 0, subtotal = quantity * unit_price
+///   DONATION           -> unit_price = 0 (forzado)
+///   WRITE_OFF          -> unit_price = 0
+///   ADJUSTMENT         -> quantity puede ser negativa (unico tipo)
+///   DEPARTMENT_DELIVERY -> unit_price = 0
+///   ENTRY              -> unit_price libre
+model MovementItem {
+  id                    String   @id @default(uuid()) @db.Uuid
+  inventory_movement_id String   @db.Uuid
+  product_variant_id    String   @db.Uuid
+  quantity              Int
+  unit_price            Decimal  @default(0) @db.Decimal(12, 2)
+  subtotal              Decimal  @default(0) @db.Decimal(12, 2)
+  created_at            DateTime @default(now()) @db.Timestamptz
+  updated_at            DateTime @updatedAt @db.Timestamptz
+
+  // Relaciones
+  inventory_movement InventoryMovement @relation(fields: [inventory_movement_id], references: [id])
+  product_variant    ProductVariant    @relation(fields: [product_variant_id], references: [id])
+
+  @@index([inventory_movement_id])
+  @@index([product_variant_id])
+  @@map("movement_items")
+}
+
+/// Registro inmutable de acciones del sistema — AUDITORIA.
+/// Solo INSERT, nunca UPDATE ni DELETE.
+/// Solo el rol ADMIN puede consultar estos logs.
+///
+/// Registra: quien, que hizo, sobre que, estado anterior/nuevo, IP, timestamp.
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String   @db.Uuid
+  action      String   @db.VarChar(50)
+  entity_type String   @db.VarChar(50)
+  entity_id   String   @db.Uuid
+  old_values  Json?
+  new_values  Json?
+  ip_address  String?  @db.VarChar(45)
+  user_agent  String?  @db.VarChar(500)
+  created_at  DateTime @default(now()) @db.Timestamptz
+
+  // Relacion — solo para saber quien ejecuto la accion
+  user User @relation(fields: [user_id], references: [id])
+
+  // Sin updated_at: los logs son inmutables
+
+  @@index([user_id])
+  @@index([entity_type, entity_id])
+  @@index([action])
+  @@index([created_at])
+  @@index([entity_type, action, created_at])
+  @@map("audit_logs")
+}

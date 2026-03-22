@@ -8,9 +8,6 @@ import {
   createManufacturerSchema,
   updateManufacturerSchema,
   manufacturerFiltersSchema,
-  type CreateManufacturerInput,
-  type UpdateManufacturerInput,
-  type ManufacturerFiltersInput,
 } from "@upds/validators";
 import { createAuditLog, diffValues } from "./audit";
 import type { ServiceResult, AuditContext } from "./auth";
@@ -51,7 +48,7 @@ export class ManufacturerService {
   constructor(private readonly db: PrismaClient) {}
 
   async create(
-    input: CreateManufacturerInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<ManufacturerData>> {
@@ -96,7 +93,7 @@ export class ManufacturerService {
   }
 
   async update(
-    input: UpdateManufacturerInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<ManufacturerData>> {
@@ -256,7 +253,7 @@ export class ManufacturerService {
     return { success: true, data: manufacturer as ManufacturerData };
   }
 
-  async list(input?: ManufacturerFiltersInput): Promise<
+  async list(input?: unknown): Promise<
     ServiceResult<{
       manufacturers: ManufacturerData[];
       total: number;

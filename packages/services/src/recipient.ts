@@ -9,9 +9,6 @@ import {
   createRecipientSchema,
   updateRecipientSchema,
   recipientFiltersSchema,
-  type CreateRecipientInput,
-  type UpdateRecipientInput,
-  type RecipientFiltersInput,
 } from "@upds/validators";
 import { createAuditLog, diffValues } from "./audit";
 import type { ServiceResult, AuditContext } from "./auth";
@@ -54,7 +51,7 @@ export class RecipientService {
   constructor(private readonly db: PrismaClient) {}
 
   async create(
-    input: CreateRecipientInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<RecipientData>> {
@@ -117,7 +114,7 @@ export class RecipientService {
   }
 
   async update(
-    input: UpdateRecipientInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<RecipientData>> {
@@ -261,7 +258,7 @@ export class RecipientService {
     return { success: true, data: recipient as RecipientData };
   }
 
-  async list(input?: RecipientFiltersInput): Promise<
+  async list(input?: unknown): Promise<
     ServiceResult<{
       recipients: RecipientData[];
       total: number;

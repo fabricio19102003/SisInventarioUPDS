@@ -126,3 +126,39 @@ export type {
   UpdateDepartmentInput,
   DepartmentFiltersInput,
 } from "./department";
+
+// Ordenes de fabricacion
+export {
+  createManufactureOrderSchema,
+  addOrderItemSchema,
+  removeOrderItemSchema,
+  receiveOrderItemsSchema,
+  cancelOrderSchema,
+  orderFiltersSchema,
+} from "./manufacture-order";
+
+export type {
+  CreateManufactureOrderInput,
+  AddOrderItemInput,
+  RemoveOrderItemInput,
+  ReceiveOrderItemsInput,
+  CancelOrderInput,
+  OrderFiltersInput,
+} from "./manufacture-order";
+
+// Movimientos de inventario
+export {
+  createMovementSchema,
+  addMovementItemSchema,
+  confirmMovementSchema,
+  cancelMovementSchema,
+  movementFiltersSchema,
+} from "./inventory-movement";
+
+export type {
+  CreateMovementInput,
+  AddMovementItemInput,
+  ConfirmMovementInput,
+  CancelMovementInput,
+  MovementFiltersInput,
+} from "./inventory-movement";

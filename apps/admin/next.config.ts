@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     "@upds/db",
     "@upds/types",
   ],
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@upds/ui"],
+  },
 };
 
 export default nextConfig;

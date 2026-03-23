@@ -1,4 +1,5 @@
 import { listProductsAction } from "@/actions/products";
+import { PageTransition } from "@upds/ui";
 import { ProductsTable } from "./components/products-table";
 
 export default async function ProductosPage({
@@ -32,11 +33,13 @@ export default async function ProductosPage({
   }
 
   return (
-    <ProductsTable
-      products={result.data.products}
-      total={result.data.total}
-      page={result.data.page}
-      perPage={result.data.per_page}
-    />
+    <PageTransition>
+      <ProductsTable
+        products={result.data.products}
+        total={result.data.total}
+        page={result.data.page}
+        perPage={result.data.per_page}
+      />
+    </PageTransition>
   );
 }

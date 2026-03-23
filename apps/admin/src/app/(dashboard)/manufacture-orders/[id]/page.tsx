@@ -4,6 +4,7 @@ import { getManufactureOrder } from "@/actions/manufacture-orders";
 import {
   Card, CardContent, CardHeader, CardTitle, Button, Badge,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+  PageTransition,
 } from "@upds/ui";
 import { MANUFACTURE_ORDER_STATUS_LABELS } from "@upds/validators";
 import { OrderActions } from "../_components/order-actions";
@@ -25,6 +26,7 @@ export default async function ManufactureOrderDetailPage({ params }: { params: P
   const totalReceived = (o.items ?? []).reduce((s: number, i: any) => s + (i.quantity_received * (i.unit_cost ?? 0)), 0);
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -147,5 +149,6 @@ export default async function ManufactureOrderDetailPage({ params }: { params: P
 
       <Link href="/manufacture-orders"><Button variant="outline">Volver al listado</Button></Link>
     </div>
+    </PageTransition>
   );
 }

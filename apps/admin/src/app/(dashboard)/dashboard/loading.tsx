@@ -3,48 +3,65 @@ import { Card, CardContent, CardHeader, Skeleton } from "@upds/ui";
 export default function DashboardLoading() {
   return (
     <div className="space-y-6">
-      <div>
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="mt-2 h-4 w-72" />
+      {/* Header */}
+      <div className="space-y-1">
+        <Skeleton className="h-8 w-[250px]" />
+        <Skeleton className="h-4 w-[350px]" />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
             <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-9 w-16" />
+              <Skeleton className="h-4 w-[120px]" />
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-8 w-[80px]" />
+              <Skeleton className="mt-2 h-3 w-[100px]" />
             </CardContent>
           </Card>
         ))}
       </div>
 
+      {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-4 w-64" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {Array.from({ length: 3 }).map((_, j) => (
-                <Skeleton key={j} className="h-16 w-full rounded-lg" />
-              ))}
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-[150px]" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-[150px]" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Area chart */}
       <Card>
         <CardHeader>
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-5 w-[200px]" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[300px] w-full" />
+        </CardContent>
+      </Card>
+
+      {/* Recent movements table */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-[180px]" />
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-12 w-full" />
             ))}

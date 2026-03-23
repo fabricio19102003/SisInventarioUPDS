@@ -3,13 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { ManufacturerData } from "@upds/services";
+import type { ColumnDef } from "@upds/ui";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
+  DataTable,
+  DataTableColumnHeader,
   Badge,
   Button,
   Input,
@@ -29,7 +26,7 @@ import {
   AlertDialogAction,
   useToast,
 } from "@upds/ui";
-import { Plus, Pencil, PowerOff, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, PowerOff, Search } from "lucide-react";
 import { deactivateManufacturerAction } from "@/actions/manufacturers";
 import { ManufacturerForm } from "./manufacturer-form";
 
@@ -64,8 +61,6 @@ export function ManufacturersTable({
   const [selectedManufacturer, setSelectedManufacturer] = useState<
     ManufacturerData | undefined
   >(undefined);
-
-  const totalPages = Math.ceil(total / perPage);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -129,6 +124,103 @@ export function ManufacturersTable({
   }
 
   // -------------------------------------------------------------------------
+  // Columns
+  // -------------------------------------------------------------------------
+
+  const columns: ColumnDef<ManufacturerData>[] = [
+    {
+      accessorKey: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Nombre" />,
+      cell: ({ row }) => <span className="font-medium">{row.getValue("name")}</span>,
+    },
+    {
+      accessorKey: "contact_name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Contacto" />,
+      cell: ({ row }) => <>{row.getValue("contact_name") ?? "—"}</>,
+    },
+    {
+      accessorKey: "phone",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Teléfono" />,
+      cell: ({ row }) => <>{row.getValue("phone") ?? "—"}</>,
+    },
+    {
+      accessorKey: "email",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+      cell: ({ row }) => <>{row.getValue("email") ?? "—"}</>,
+    },
+    {
+      accessorKey: "is_active",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
+      cell: ({ row }) => {
+        const isActive = row.getValue("is_active") as boolean;
+        return (
+          <Badge variant={isActive ? "default" : "secondary"}>
+            {isActive ? "Activo" : "Inactivo"}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "actions",
+      size: 100,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const m = row.original;
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!m.is_active}
+              onClick={() => handleEditClick(m)}
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Editar</span>
+            </Button>
+
+            {m.is_active && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={isPending}
+                  >
+                    <PowerOff className="h-4 w-4 text-destructive" />
+                    <span className="sr-only">Desactivar</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      ¿Desactivar fabricante?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Se desactivará <strong>{m.name}</strong>. No
+                      podrá ser usado en nuevas órdenes de
+                      fabricación. Esta acción no es irreversible —
+                      contactá al administrador para reactivarlo.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => handleDeactivate(m.id)}
+                    >
+                      Desactivar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -151,153 +243,51 @@ export function ManufacturersTable({
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <form onSubmit={handleSearch} className="flex flex-1 gap-2">
-          <Input
-            name="search"
-            placeholder="Buscar por nombre o contacto..."
-            defaultValue={currentSearch}
-            className="flex-1"
-          />
-          <Button type="submit" variant="outline" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
+      {/* DataTable */}
+      <DataTable
+        columns={columns}
+        data={manufacturers}
+        toolbar={
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <form onSubmit={handleSearch} className="flex flex-1 gap-2">
+              <Input
+                name="search"
+                placeholder="Buscar por nombre o contacto..."
+                defaultValue={currentSearch}
+                className="flex-1"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
 
-        <Select value={currentStatus} onValueChange={handleStatusFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="true">Activos</SelectItem>
-            <SelectItem value="false">Inactivos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead>Teléfono</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-[100px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {manufacturers.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No se encontraron fabricantes.
-                </TableCell>
-              </TableRow>
-            ) : (
-              manufacturers.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell className="font-medium">{m.name}</TableCell>
-                  <TableCell>{m.contact_name ?? "—"}</TableCell>
-                  <TableCell>{m.phone ?? "—"}</TableCell>
-                  <TableCell>{m.email ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={m.is_active ? "default" : "secondary"}>
-                      {m.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!m.is_active}
-                        onClick={() => handleEditClick(m)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Editar</span>
-                      </Button>
-
-                      {m.is_active && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isPending}
-                            >
-                              <PowerOff className="h-4 w-4 text-destructive" />
-                              <span className="sr-only">Desactivar</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                ¿Desactivar fabricante?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Se desactivará <strong>{m.name}</strong>. No
-                                podrá ser usado en nuevas órdenes de
-                                fabricación. Esta acción no es irreversible —
-                                contactá al administrador para reactivarlo.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => handleDeactivate(m.id)}
-                              >
-                                Desactivar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {total} fabricante{total !== 1 ? "s" : ""} en total
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page <= 1}
-              onClick={() => pushParams({ page: String(page - 1) })}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span>
-              Página {page} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page >= totalPages}
-              onClick={() => pushParams({ page: String(page + 1) })}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <Select value={currentStatus} onValueChange={handleStatusFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="true">Activos</SelectItem>
+                <SelectItem value="false">Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-      )}
+        }
+        emptyState={
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No se encontraron fabricantes.
+          </div>
+        }
+        rowCount={total}
+        pagination={{ pageIndex: page - 1, pageSize: perPage }}
+        onPaginationChange={(updater) => {
+          const next =
+            typeof updater === "function"
+              ? updater({ pageIndex: page - 1, pageSize: perPage })
+              : updater;
+          pushParams({ page: String(next.pageIndex + 1) });
+        }}
+      />
 
       {/* Form Dialog */}
       <ManufacturerForm

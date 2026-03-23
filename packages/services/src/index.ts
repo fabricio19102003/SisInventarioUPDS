@@ -42,4 +42,4 @@ export type { MovementData, MovementItemData } from "./inventory-movement";
 
 // Dashboard / Reportes
 export { DashboardService } from "./dashboard";
-export type { DashboardStats, StockByArea, OrderStatusSummary, RecentMovement } from "./dashboard";
+export type { DashboardStats, StockByArea, OrderStatusSummary, RecentMovement, MonthlyMovements } from "./dashboard";

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDepartment } from "@/actions/departments";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from "@upds/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, PageTransition } from "@upds/ui";
 import { DepartmentActions } from "../_components/department-actions";
 
 export default async function DepartmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +11,7 @@ export default async function DepartmentDetailPage({ params }: { params: Promise
   const d = result.data;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -27,5 +28,6 @@ export default async function DepartmentDetailPage({ params }: { params: Promise
       </div>
       <Link href="/departments"><Button variant="outline">Volver al listado</Button></Link>
     </div>
+    </PageTransition>
   );
 }

@@ -4,9 +4,13 @@ import type { DashboardStats, RecentMovement } from "@upds/services";
 import {
   MOVEMENT_TYPE_LABELS,
   MOVEMENT_STATUS_LABELS,
-  MANUFACTURE_ORDER_STATUS_LABELS,
-  WAREHOUSE_AREA_LABELS,
 } from "@upds/validators";
+import {
+  StaggerContainer,
+  StaggerItem,
+  FadeInUp,
+} from "@upds/ui";
+import { DashboardCharts } from "./components/dashboard-charts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,132 +114,56 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <KpiCard
-          label="Productos activos"
-          value={stats.total_active_products}
-          href="/productos"
-        />
-        <KpiCard
-          label="Variantes activas"
-          value={stats.total_active_variants}
-          href="/productos"
-        />
-        <KpiCard
-          label="Alertas stock bajo"
-          value={stats.low_stock_alerts}
-          href="/productos?low_stock=true"
-          alert
-        />
-        <KpiCard
-          label="Órdenes pendientes"
-          value={stats.pending_manufacture_orders}
-          href="/ordenes?status=PENDING"
-        />
-        <KpiCard
-          label="Movimientos borrador"
-          value={stats.draft_movements}
-          href="/movimientos?status=DRAFT"
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+        <StaggerItem>
+          <KpiCard
+            label="Productos activos"
+            value={stats.total_active_products}
+            href="/productos"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Variantes activas"
+            value={stats.total_active_variants}
+            href="/productos"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Alertas stock bajo"
+            value={stats.low_stock_alerts}
+            href="/productos?low_stock=true"
+            alert
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Órdenes pendientes"
+            value={stats.pending_manufacture_orders}
+            href="/ordenes?status=PENDING"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Movimientos borrador"
+            value={stats.draft_movements}
+            href="/movimientos?status=DRAFT"
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
-      {/* Two-column layout */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Stock por área */}
-        <div className="rounded-lg border p-5">
-          <h2 className="text-lg font-semibold">Stock por Área</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Distribución de inventario por sector de almacén
-          </p>
-
-          {stats.stock_by_area.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              Sin datos de stock.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {stats.stock_by_area.map((area) => (
-                <div key={area.warehouse_area} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      {WAREHOUSE_AREA_LABELS[
-                        area.warehouse_area as keyof typeof WAREHOUSE_AREA_LABELS
-                      ] ?? area.warehouse_area}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {area.total_stock} unidades
-                    </span>
-                  </div>
-                  <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>{area.total_variants} variantes</span>
-                    {area.low_stock_variants > 0 && (
-                      <span className="text-destructive font-medium">
-                        {area.low_stock_variants} con stock bajo
-                      </span>
-                    )}
-                  </div>
-                  {/* Simple bar */}
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${
-                        area.low_stock_variants > 0
-                          ? "bg-destructive/70"
-                          : "bg-primary"
-                      }`}
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          stats.stock_by_area.reduce((max, a) => Math.max(max, a.total_stock), 1) > 0
-                            ? (area.total_stock /
-                                stats.stock_by_area.reduce((max, a) => Math.max(max, a.total_stock), 1)) *
-                              100
-                            : 0,
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Órdenes por estado */}
-        <div className="rounded-lg border p-5">
-          <h2 className="text-lg font-semibold">Órdenes de Fabricación</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Estado actual de las órdenes
-          </p>
-
-          {stats.manufacture_orders_by_status.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              Sin órdenes registradas.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {stats.manufacture_orders_by_status.map((entry) => (
-                <div
-                  key={entry.status}
-                  className="flex items-center justify-between rounded-lg bg-muted/40 px-4 py-3"
-                >
-                  <span className="text-sm font-medium">
-                    {MANUFACTURE_ORDER_STATUS_LABELS[
-                      entry.status as keyof typeof MANUFACTURE_ORDER_STATUS_LABELS
-                    ] ?? entry.status}
-                  </span>
-                  <span
-                    className={`text-xl font-bold ${getStatusColor(entry.status)}`}
-                  >
-                    {entry.count}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Charts: Stock por Área + Órdenes + Movimientos por Mes */}
+      <FadeInUp delay={0.2}>
+        <DashboardCharts
+          stockByArea={stats.stock_by_area}
+          ordersByStatus={stats.manufacture_orders_by_status}
+          movementsByMonth={stats.movements_by_month}
+        />
+      </FadeInUp>
 
       {/* Últimos movimientos */}
+      <FadeInUp delay={0.3}>
       <div className="rounded-lg border p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -305,6 +233,7 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+      </FadeInUp>
     </div>
   );
 }

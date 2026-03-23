@@ -3,13 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { DepartmentData } from "@upds/services";
+import type { ColumnDef } from "@upds/ui";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
+  DataTable,
+  DataTableColumnHeader,
   Badge,
   Button,
   Input,
@@ -34,8 +31,6 @@ import {
   Pencil,
   PowerOff,
   Search,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { deactivateDepartmentAction } from "@/actions/departments";
 import { DepartmentForm } from "./department-form";
@@ -71,8 +66,6 @@ export function DepartmentsTable({
   const [selectedDepartment, setSelectedDepartment] = useState<
     DepartmentData | undefined
   >(undefined);
-
-  const totalPages = Math.ceil(total / perPage);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -136,6 +129,99 @@ export function DepartmentsTable({
   }
 
   // -------------------------------------------------------------------------
+  // Columns
+  // -------------------------------------------------------------------------
+
+  const columns: ColumnDef<DepartmentData>[] = [
+    {
+      accessorKey: "code",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Código" />,
+      cell: ({ row }) => (
+        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-medium">
+          {row.getValue("code")}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Nombre" />,
+      cell: ({ row }) => <span className="font-medium">{row.getValue("name")}</span>,
+    },
+    {
+      accessorKey: "is_active",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
+      cell: ({ row }) => {
+        const isActive = row.getValue("is_active") as boolean;
+        return (
+          <Badge variant={isActive ? "default" : "secondary"}>
+            {isActive ? "Activo" : "Inactivo"}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "actions",
+      size: 100,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const d = row.original;
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!d.is_active}
+              onClick={() => handleEditClick(d)}
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Editar</span>
+            </Button>
+
+            {d.is_active && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={isPending}
+                  >
+                    <PowerOff className="h-4 w-4 text-destructive" />
+                    <span className="sr-only">Desactivar</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      ¿Desactivar departamento?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Se desactivará{" "}
+                      <strong>
+                        {d.name} ({d.code})
+                      </strong>
+                      . Ya no podrá recibir entregas de material de
+                      oficina.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => handleDeactivate(d.id)}
+                    >
+                      Desactivar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -158,155 +244,51 @@ export function DepartmentsTable({
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <form onSubmit={handleSearch} className="flex flex-1 gap-2">
-          <Input
-            name="search"
-            placeholder="Buscar por nombre o código..."
-            defaultValue={currentSearch}
-            className="flex-1"
-          />
-          <Button type="submit" variant="outline" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
+      {/* DataTable */}
+      <DataTable
+        columns={columns}
+        data={departments}
+        toolbar={
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <form onSubmit={handleSearch} className="flex flex-1 gap-2">
+              <Input
+                name="search"
+                placeholder="Buscar por nombre o código..."
+                defaultValue={currentSearch}
+                className="flex-1"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
 
-        <Select value={currentStatus} onValueChange={handleStatusFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="true">Activos</SelectItem>
-            <SelectItem value="false">Inactivos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-[100px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {departments.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No se encontraron departamentos.
-                </TableCell>
-              </TableRow>
-            ) : (
-              departments.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell>
-                    <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-medium">
-                      {d.code}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">{d.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={d.is_active ? "default" : "secondary"}>
-                      {d.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!d.is_active}
-                        onClick={() => handleEditClick(d)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Editar</span>
-                      </Button>
-
-                      {d.is_active && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isPending}
-                            >
-                              <PowerOff className="h-4 w-4 text-destructive" />
-                              <span className="sr-only">Desactivar</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                ¿Desactivar departamento?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Se desactivará{" "}
-                                <strong>
-                                  {d.name} ({d.code})
-                                </strong>
-                                . Ya no podrá recibir entregas de material de
-                                oficina.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => handleDeactivate(d.id)}
-                              >
-                                Desactivar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {total} departamento{total !== 1 ? "s" : ""} en total
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page <= 1}
-              onClick={() => pushParams({ page: String(page - 1) })}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span>
-              Página {page} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page >= totalPages}
-              onClick={() => pushParams({ page: String(page + 1) })}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <Select value={currentStatus} onValueChange={handleStatusFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="true">Activos</SelectItem>
+                <SelectItem value="false">Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-      )}
+        }
+        emptyState={
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No se encontraron departamentos.
+          </div>
+        }
+        rowCount={total}
+        pagination={{ pageIndex: page - 1, pageSize: perPage }}
+        onPaginationChange={(updater) => {
+          const next =
+            typeof updater === "function"
+              ? updater({ pageIndex: page - 1, pageSize: perPage })
+              : updater;
+          pushParams({ page: String(next.pageIndex + 1) });
+        }}
+      />
 
       {/* Form Dialog */}
       <DepartmentForm

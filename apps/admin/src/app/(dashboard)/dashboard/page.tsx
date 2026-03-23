@@ -13,40 +13,23 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  PageTransition,
+  StaggerContainer,
+  StaggerItem,
+  FadeInUp,
 } from "@upds/ui";
 import {
   MOVEMENT_TYPE_LABELS,
   MOVEMENT_STATUS_LABELS,
-  MANUFACTURE_ORDER_STATUS_LABELS,
-  WAREHOUSE_AREA_LABELS,
 } from "@upds/validators";
-import type {
-  MovementType,
-  MovementStatus,
-  ManufactureOrderStatus,
-  WarehouseArea,
-} from "@upds/validators";
+import type { MovementType, MovementStatus } from "@upds/validators";
+import { DashboardCharts } from "./_components/dashboard-charts";
 
 function movementStatusColor(status: string): string {
   switch (status) {
     case "DRAFT":
       return "bg-yellow-100 text-yellow-800 border-yellow-200";
     case "CONFIRMED":
-      return "bg-green-100 text-green-800 border-green-200";
-    case "CANCELLED":
-      return "bg-red-100 text-red-800 border-red-200";
-    default:
-      return "bg-gray-100 text-gray-800 border-gray-200";
-  }
-}
-
-function manufactureStatusColor(status: string): string {
-  switch (status) {
-    case "PENDING":
-      return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    case "IN_PROGRESS":
-      return "bg-blue-100 text-blue-800 border-blue-200";
-    case "COMPLETED":
       return "bg-green-100 text-green-800 border-green-200";
     case "CANCELLED":
       return "bg-red-100 text-red-800 border-red-200";
@@ -96,6 +79,7 @@ export default async function DashboardPage() {
   const stats = result.data;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -108,8 +92,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Productos Activos */}
+        <StaggerItem>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Productos Activos</CardDescription>
@@ -123,8 +108,10 @@ export default async function DashboardPage() {
             </p>
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Variantes con Stock Bajo */}
+        <StaggerItem>
         <Card
           className={
             stats.low_stock_alerts > 0
@@ -165,8 +152,10 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Ordenes Pendientes */}
+        <StaggerItem>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Ordenes Pendientes</CardDescription>
@@ -183,8 +172,10 @@ export default async function DashboardPage() {
             </Link>
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Movimientos en Borrador */}
+        <StaggerItem>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Movimientos en Borrador</CardDescription>
@@ -201,116 +192,20 @@ export default async function DashboardPage() {
             </Link>
           </CardContent>
         </Card>
-      </div>
+        </StaggerItem>
+      </StaggerContainer>
 
-      {/* Stock por Area + Ordenes por Estado */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Stock por Area */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Stock por Area</CardTitle>
-            <CardDescription>
-              Distribucion del inventario por sector del almacen
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats.stock_by_area.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No hay datos de stock disponibles.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {stats.stock_by_area.map((area) => {
-                  const label =
-                    WAREHOUSE_AREA_LABELS[
-                      area.warehouse_area as WarehouseArea
-                    ] ?? area.warehouse_area;
-                  const lowStockPercent =
-                    area.total_variants > 0
-                      ? Math.round(
-                          (area.low_stock_variants / area.total_variants) * 100
-                        )
-                      : 0;
-
-                  return (
-                    <div
-                      key={area.warehouse_area}
-                      className="flex items-center justify-between rounded-lg border p-4"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {area.total_variants} variantes
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4 text-right">
-                        <div>
-                          <p className="text-lg font-semibold tabular-nums">
-                            {area.total_stock}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            unidades
-                          </p>
-                        </div>
-                        {area.low_stock_variants > 0 && (
-                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100">
-                            {area.low_stock_variants} bajo stock
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Ordenes por Estado */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Ordenes por Estado</CardTitle>
-            <CardDescription>
-              Estado actual de las ordenes de fabricacion
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats.manufacture_orders_by_status.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No hay ordenes de fabricacion registradas.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {stats.manufacture_orders_by_status.map((item) => {
-                  const label =
-                    MANUFACTURE_ORDER_STATUS_LABELS[
-                      item.status as ManufactureOrderStatus
-                    ] ?? item.status;
-                  const colorClass = manufactureStatusColor(item.status);
-
-                  return (
-                    <div
-                      key={item.status}
-                      className="flex items-center justify-between rounded-lg border p-4"
-                    >
-                      <Badge className={`${colorClass} hover:${colorClass}`}>
-                        {label}
-                      </Badge>
-                      <span className="text-2xl font-semibold tabular-nums">
-                        {item.count}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Charts: Stock por Area, Ordenes por Estado, Movimientos por Mes */}
+      <FadeInUp delay={0.2}>
+      <DashboardCharts
+        stockByArea={stats.stock_by_area}
+        ordersByStatus={stats.manufacture_orders_by_status}
+        movementsByMonth={stats.movements_by_month}
+      />
+      </FadeInUp>
 
       {/* Movimientos Recientes */}
+      <FadeInUp delay={0.4}>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -386,6 +281,8 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      </FadeInUp>
     </div>
+    </PageTransition>
   );
 }

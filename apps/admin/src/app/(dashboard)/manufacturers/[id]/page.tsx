@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getManufacturer } from "@/actions/manufacturers";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from "@upds/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, PageTransition } from "@upds/ui";
 import { ManufacturerActions } from "../_components/manufacturer-actions";
 
 export default async function ManufacturerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,6 +12,7 @@ export default async function ManufacturerDetailPage({ params }: { params: Promi
   const m = result.data;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -58,5 +59,6 @@ export default async function ManufacturerDetailPage({ params }: { params: Promi
         <Button variant="outline">Volver al listado</Button>
       </Link>
     </div>
+    </PageTransition>
   );
 }

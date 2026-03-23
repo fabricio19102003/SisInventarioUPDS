@@ -4,6 +4,7 @@ import { getProduct } from "@/actions/products";
 import {
   Card, CardContent, CardHeader, CardTitle, Button, Badge,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+  PageTransition,
 } from "@upds/ui";
 import {
   PRODUCT_CATEGORY_LABELS, GARMENT_TYPE_LABELS, WAREHOUSE_AREA_LABELS,
@@ -19,6 +20,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const isMedical = p.category === "MEDICAL_GARMENT";
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -114,5 +116,6 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       <Link href="/products"><Button variant="outline">Volver al listado</Button></Link>
     </div>
+    </PageTransition>
   );
 }

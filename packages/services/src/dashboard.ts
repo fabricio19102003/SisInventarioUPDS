@@ -34,6 +34,13 @@ export interface RecentMovement {
   department_name: string | null;
 }
 
+export interface MonthlyMovements {
+  month: string; // "2026-01", "2026-02", etc.
+  entries: number;
+  exits: number;
+  total: number;
+}
+
 export interface DashboardStats {
   total_active_products: number;
   total_active_variants: number;
@@ -43,6 +50,7 @@ export interface DashboardStats {
   stock_by_area: StockByArea[];
   manufacture_orders_by_status: OrderStatusSummary[];
   recent_movements: RecentMovement[];
+  movements_by_month: MonthlyMovements[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +70,7 @@ export class DashboardService {
       variantsByArea,
       ordersByStatus,
       recentMovements,
+      movementsLast6Months,
     ] = await Promise.all([
       // Total de productos activos
       this.db.product.count({ where: { is_active: true } }),
@@ -115,6 +124,24 @@ export class DashboardService {
           created_at: true,
           recipient: { select: { full_name: true } },
           department: { select: { name: true } },
+        },
+      }),
+
+      // Movimientos confirmados de los ultimos 6 meses (para grafico)
+      this.db.inventoryMovement.findMany({
+        where: {
+          status: "CONFIRMED",
+          created_at: {
+            gte: new Date(
+              new Date().getFullYear(),
+              new Date().getMonth() - 5,
+              1,
+            ),
+          },
+        },
+        select: {
+          movement_type: true,
+          created_at: true,
         },
       }),
     ]);
@@ -182,6 +209,34 @@ export class DashboardService {
     // Suprimir advertencias de variables no usadas de groupBy (solo usamos variantsWithArea)
     void variantsByArea;
 
+    // Agrupar movimientos por mes
+    const ENTRY_TYPES = new Set(["ENTRY"]);
+    const monthMap = new Map<string, { entries: number; exits: number; total: number }>();
+
+    // Generar los ultimos 6 meses para asegurar meses vacios
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      monthMap.set(key, { entries: 0, exits: 0, total: 0 });
+    }
+
+    for (const m of movementsLast6Months) {
+      const d = m.created_at;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const entry = monthMap.get(key);
+      if (!entry) continue;
+      entry.total++;
+      if (ENTRY_TYPES.has(m.movement_type)) {
+        entry.entries++;
+      } else {
+        entry.exits++;
+      }
+    }
+
+    const movementsByMonth: MonthlyMovements[] = Array.from(monthMap.entries()).map(
+      ([month, data]) => ({ month, ...data }),
+    );
+
     return {
       success: true,
       data: {
@@ -193,6 +248,7 @@ export class DashboardService {
         stock_by_area: stockByArea,
         manufacture_orders_by_status: manufactureOrdersByStatus,
         recent_movements: recentMovementsData,
+        movements_by_month: movementsByMonth,
       },
     };
   }

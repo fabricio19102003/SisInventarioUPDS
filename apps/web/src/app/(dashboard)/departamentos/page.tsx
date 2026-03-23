@@ -1,4 +1,5 @@
 import { listDepartmentsAction } from "@/actions/departments";
+import { PageTransition } from "@upds/ui";
 import { DepartmentsTable } from "./components/departments-table";
 
 export default async function DepartamentosPage({
@@ -29,11 +30,13 @@ export default async function DepartamentosPage({
   }
 
   return (
-    <DepartmentsTable
-      departments={result.data.departments}
-      total={result.data.total}
-      page={result.data.page}
-      perPage={result.data.per_page}
-    />
+    <PageTransition>
+      <DepartmentsTable
+        departments={result.data.departments}
+        total={result.data.total}
+        page={result.data.page}
+        perPage={result.data.per_page}
+      />
+    </PageTransition>
   );
 }

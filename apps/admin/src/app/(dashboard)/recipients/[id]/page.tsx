@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getRecipient } from "@/actions/recipients";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from "@upds/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, PageTransition } from "@upds/ui";
 import { RECIPIENT_TYPE_LABELS } from "@upds/validators";
 import { RecipientActions } from "../_components/recipient-actions";
 
@@ -12,6 +12,7 @@ export default async function RecipientDetailPage({ params }: { params: Promise<
   const r = result.data;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -53,5 +54,6 @@ export default async function RecipientDetailPage({ params }: { params: Promise<
       </Card>
       <Link href="/recipients"><Button variant="outline">Volver al listado</Button></Link>
     </div>
+    </PageTransition>
   );
 }

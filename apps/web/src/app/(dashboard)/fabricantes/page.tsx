@@ -1,4 +1,5 @@
 import { listManufacturersAction } from "@/actions/manufacturers";
+import { PageTransition } from "@upds/ui";
 import { ManufacturersTable } from "./components/manufacturers-table";
 
 export default async function FabricantesPage({
@@ -29,11 +30,13 @@ export default async function FabricantesPage({
   }
 
   return (
-    <ManufacturersTable
-      manufacturers={result.data.manufacturers}
-      total={result.data.total}
-      page={result.data.page}
-      perPage={result.data.per_page}
-    />
+    <PageTransition>
+      <ManufacturersTable
+        manufacturers={result.data.manufacturers}
+        total={result.data.total}
+        page={result.data.page}
+        perPage={result.data.per_page}
+      />
+    </PageTransition>
   );
 }

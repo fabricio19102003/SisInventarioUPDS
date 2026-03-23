@@ -3,6 +3,7 @@ import { listProductsAction } from "@/actions/products";
 import { listRecipientsAction } from "@/actions/recipients";
 import { listDepartmentsAction } from "@/actions/departments";
 import { listOrdersAction } from "@/actions/manufacture-orders";
+import { PageTransition } from "@upds/ui";
 import { MovementsTable } from "./components/movements-table";
 
 export default async function MovimientosPage({
@@ -43,15 +44,17 @@ export default async function MovimientosPage({
   }
 
   return (
-    <MovementsTable
-      movements={movementsResult.data.movements}
-      total={movementsResult.data.total}
-      page={movementsResult.data.page}
-      perPage={movementsResult.data.per_page}
-      products={productsResult.success ? productsResult.data.products : []}
-      recipients={recipientsResult.success ? recipientsResult.data.recipients : []}
-      departments={departmentsResult.success ? departmentsResult.data.departments : []}
-      orders={ordersResult.success ? ordersResult.data.orders : []}
-    />
+    <PageTransition>
+      <MovementsTable
+        movements={movementsResult.data.movements}
+        total={movementsResult.data.total}
+        page={movementsResult.data.page}
+        perPage={movementsResult.data.per_page}
+        products={productsResult.success ? productsResult.data.products : []}
+        recipients={recipientsResult.success ? recipientsResult.data.recipients : []}
+        departments={departmentsResult.success ? departmentsResult.data.departments : []}
+        orders={ordersResult.success ? ordersResult.data.orders : []}
+      />
+    </PageTransition>
   );
 }

@@ -1,6 +1,7 @@
 import { listOrdersAction } from "@/actions/manufacture-orders";
 import { listManufacturersAction } from "@/actions/manufacturers";
 import { listProductsAction } from "@/actions/products";
+import { PageTransition } from "@upds/ui";
 import { OrdersTable } from "./components/orders-table";
 
 export default async function OrdenesPage({
@@ -33,13 +34,15 @@ export default async function OrdenesPage({
   }
 
   return (
-    <OrdersTable
-      orders={ordersResult.data.orders}
-      total={ordersResult.data.total}
-      page={ordersResult.data.page}
-      perPage={ordersResult.data.per_page}
-      manufacturers={manufacturersResult.success ? manufacturersResult.data.manufacturers : []}
-      products={productsResult.success ? productsResult.data.products : []}
-    />
+    <PageTransition>
+      <OrdersTable
+        orders={ordersResult.data.orders}
+        total={ordersResult.data.total}
+        page={ordersResult.data.page}
+        perPage={ordersResult.data.per_page}
+        manufacturers={manufacturersResult.success ? manufacturersResult.data.manufacturers : []}
+        products={productsResult.success ? productsResult.data.products : []}
+      />
+    </PageTransition>
   );
 }

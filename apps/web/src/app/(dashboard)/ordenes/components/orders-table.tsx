@@ -3,18 +3,15 @@
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { ManufactureOrderData, ManufacturerData, ProductData } from "@upds/services";
+import type { ColumnDef } from "@upds/ui";
 import {
   ManufactureOrderStatus,
   MANUFACTURE_ORDER_STATUS_LABELS,
   enumToOptions,
 } from "@upds/validators";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
+  DataTable,
+  DataTableColumnHeader,
   Badge,
   Button,
   Input,
@@ -29,8 +26,6 @@ import {
   Plus,
   Eye,
   Search,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { OrderSheet } from "./order-sheet";
 
@@ -93,8 +88,6 @@ export function OrdersTable({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ManufactureOrderData | null>(null);
 
-  const totalPages = Math.ceil(total / perPage);
-
   // -------------------------------------------------------------------------
   // URL helpers
   // -------------------------------------------------------------------------
@@ -130,12 +123,94 @@ export function OrdersTable({
   }
 
   // -------------------------------------------------------------------------
-  // Render
+  // Columns
   // -------------------------------------------------------------------------
 
   const currentSearch = searchParams.get("search") ?? "";
   const currentStatus = searchParams.get("status") ?? "all";
   const currentManufacturer = searchParams.get("manufacturer_id") ?? "all";
+
+  const columns: ColumnDef<ManufactureOrderData>[] = [
+    {
+      accessorKey: "order_number",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Número" />,
+      cell: ({ row }) => (
+        <span className="font-mono text-sm font-medium">
+          {row.getValue("order_number")}
+        </span>
+      ),
+    },
+    {
+      id: "manufacturer",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Fabricante" />,
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.manufacturer.name}</span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
+      cell: ({ row }) => (
+        <Badge variant={getStatusVariant(row.getValue("status"))} className="text-xs">
+          {MANUFACTURE_ORDER_STATUS_LABELS[row.getValue("status") as keyof typeof MANUFACTURE_ORDER_STATUS_LABELS]}
+        </Badge>
+      ),
+    },
+    {
+      id: "items_count",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Ítems" />,
+      cell: ({ row }) => (
+        <div className="text-right text-sm">{row.original.items.length}</div>
+      ),
+    },
+    {
+      id: "total_estimated",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Total estimado" />,
+      cell: ({ row }) => (
+        <div className="text-right text-sm font-medium">
+          {formatAmount(calcTotal(row.original))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "expected_at",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Esperada" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {row.getValue("expected_at")
+            ? new Date(row.getValue("expected_at") as string).toLocaleDateString("es-BO")
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "ordered_at",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Fecha" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {new Date(row.getValue("ordered_at")).toLocaleDateString("es-BO")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      size: 60,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleViewClick(row.original)}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <div className="space-y-4">
@@ -153,174 +228,99 @@ export function OrdersTable({
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <form onSubmit={handleSearch} className="flex flex-1 gap-2 min-w-[200px]">
-          <Input
-            name="search"
-            placeholder="Buscar por número o fabricante..."
-            defaultValue={currentSearch}
-            className="flex-1"
-          />
-          <Button type="submit" variant="outline" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
+      {/* DataTable */}
+      <DataTable
+        columns={columns}
+        data={orders}
+        toolbar={
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <form onSubmit={handleSearch} className="flex flex-1 gap-2 min-w-[200px]">
+              <Input
+                name="search"
+                placeholder="Buscar por número o fabricante..."
+                defaultValue={currentSearch}
+                className="flex-1"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
 
-        <Select
-          value={currentStatus}
-          onValueChange={(v) =>
-            pushParams({ status: v === "all" ? undefined : v, page: undefined })
-          }
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            {statusOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={currentManufacturer}
-          onValueChange={(v) =>
-            pushParams({ manufacturer_id: v === "all" ? undefined : v, page: undefined })
-          }
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Fabricante" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los fabricantes</SelectItem>
-            {manufacturers.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            className="w-[145px]"
-            defaultValue={searchParams.get("date_from") ?? ""}
-            onChange={(e) =>
-              pushParams({ date_from: e.target.value || undefined, page: undefined })
-            }
-          />
-          <span className="text-muted-foreground text-sm">—</span>
-          <Input
-            type="date"
-            className="w-[145px]"
-            defaultValue={searchParams.get("date_to") ?? ""}
-            onChange={(e) =>
-              pushParams({ date_to: e.target.value || undefined, page: undefined })
-            }
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Número</TableHead>
-              <TableHead>Fabricante</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Ítems</TableHead>
-              <TableHead className="text-right">Total estimado</TableHead>
-              <TableHead>Esperada</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead className="w-[60px]">Ver</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {orders.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No se encontraron órdenes.
-                </TableCell>
-              </TableRow>
-            ) : (
-              orders.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell>
-                    <span className="font-mono text-sm font-medium">
-                      {o.order_number}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">{o.manufacturer.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(o.status)} className="text-xs">
-                      {MANUFACTURE_ORDER_STATUS_LABELS[o.status as keyof typeof MANUFACTURE_ORDER_STATUS_LABELS]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-sm">
-                    {o.items.length}
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-medium">
-                    {formatAmount(calcTotal(o))}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {o.expected_at
-                      ? new Date(o.expected_at).toLocaleDateString("es-BO")
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(o.ordered_at).toLocaleDateString("es-BO")}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleViewClick(o)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{total} orden{total !== 1 ? "es" : ""} en total</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page <= 1}
-              onClick={() => pushParams({ page: String(page - 1) })}
+            <Select
+              value={currentStatus}
+              onValueChange={(v) =>
+                pushParams({ status: v === "all" ? undefined : v, page: undefined })
+              }
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span>Página {page} de {totalPages}</span>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page >= totalPages}
-              onClick={() => pushParams({ page: String(page + 1) })}
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                {statusOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={currentManufacturer}
+              onValueChange={(v) =>
+                pushParams({ manufacturer_id: v === "all" ? undefined : v, page: undefined })
+              }
             >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Fabricante" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los fabricantes</SelectItem>
+                {manufacturers.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Date range */}
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                className="w-[145px]"
+                defaultValue={searchParams.get("date_from") ?? ""}
+                onChange={(e) =>
+                  pushParams({ date_from: e.target.value || undefined, page: undefined })
+                }
+              />
+              <span className="text-muted-foreground text-sm">—</span>
+              <Input
+                type="date"
+                className="w-[145px]"
+                defaultValue={searchParams.get("date_to") ?? ""}
+                onChange={(e) =>
+                  pushParams({ date_to: e.target.value || undefined, page: undefined })
+                }
+              />
+            </div>
           </div>
-        </div>
-      )}
+        }
+        emptyState={
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No se encontraron órdenes.
+          </div>
+        }
+        rowCount={total}
+        pagination={{ pageIndex: page - 1, pageSize: perPage }}
+        onPaginationChange={(updater) => {
+          const next =
+            typeof updater === "function"
+              ? updater({ pageIndex: page - 1, pageSize: perPage })
+              : updater;
+          pushParams({ page: String(next.pageIndex + 1) });
+        }}
+      />
 
       {/* Order Sheet */}
       <OrderSheet

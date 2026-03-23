@@ -41,7 +41,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#002B5C] to-[#4A90D9] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#002B5C] to-[#4A90D9] dark:from-[#001a38] dark:to-[#1a3a5c] p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-1">
           <CardTitle className="text-4xl font-bold text-primary tracking-wider">
@@ -84,7 +84,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-500 text-center">{error}</p>
+              <p className="text-sm text-destructive text-center">{error}</p>
             )}
 
             <Button

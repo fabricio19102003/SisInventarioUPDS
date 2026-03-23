@@ -4,6 +4,7 @@ import { getInventoryMovement } from "@/actions/inventory-movements";
 import {
   Card, CardContent, CardHeader, CardTitle, Button, Badge,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+  PageTransition,
 } from "@upds/ui";
 import { MOVEMENT_TYPE_LABELS, MOVEMENT_STATUS_LABELS } from "@upds/validators";
 import { MovementActions, RemoveItemButton } from "../_components/movement-actions";
@@ -23,6 +24,7 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
   const isSale = m.movement_type === "SALE";
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -163,5 +165,6 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
 
       <Link href="/inventory-movements"><Button variant="outline">Volver al listado</Button></Link>
     </div>
+    </PageTransition>
   );
 }

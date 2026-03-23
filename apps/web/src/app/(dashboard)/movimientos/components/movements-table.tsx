@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { MovementData } from "@upds/services";
 import type { ProductData, RecipientData, DepartmentData, ManufactureOrderData } from "@upds/services";
+import type { ColumnDef } from "@upds/ui";
 import {
   MovementType,
   MOVEMENT_TYPE_LABELS,
@@ -12,12 +13,8 @@ import {
   enumToOptions,
 } from "@upds/validators";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
+  DataTable,
+  DataTableColumnHeader,
   Badge,
   Button,
   Input,
@@ -32,8 +29,6 @@ import {
   Plus,
   Eye,
   Search,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { MovementSheet } from "./movement-sheet";
 
@@ -110,8 +105,6 @@ export function MovementsTable({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<MovementData | null>(null);
 
-  const totalPages = Math.ceil(total / perPage);
-
   // -------------------------------------------------------------------------
   // URL helpers
   // -------------------------------------------------------------------------
@@ -145,12 +138,94 @@ export function MovementsTable({
   }
 
   // -------------------------------------------------------------------------
-  // Render
+  // Columns
   // -------------------------------------------------------------------------
 
   const currentSearch = searchParams.get("search") ?? "";
   const currentType = searchParams.get("movement_type") ?? "all";
   const currentStatus = searchParams.get("status") ?? "all";
+
+  const columns: ColumnDef<MovementData>[] = [
+    {
+      accessorKey: "movement_number",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Número" />,
+      cell: ({ row }) => (
+        <span className="font-mono text-sm font-medium">
+          {row.getValue("movement_number")}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "movement_type",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" />,
+      cell: ({ row }) => (
+        <Badge variant={getTypeVariant(row.getValue("movement_type"))} className="text-xs">
+          {MOVEMENT_TYPE_LABELS[row.getValue("movement_type") as keyof typeof MOVEMENT_TYPE_LABELS]}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
+      cell: ({ row }) => (
+        <Badge variant={getStatusVariant(row.getValue("status"))}>
+          {MOVEMENT_STATUS_LABELS[row.getValue("status") as keyof typeof MOVEMENT_STATUS_LABELS]}
+        </Badge>
+      ),
+    },
+    {
+      id: "target",
+      header: "Destino / Referencia",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground max-w-[180px] truncate block">
+          {getMovementTarget(row.original)}
+        </span>
+      ),
+    },
+    {
+      id: "items_count",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Ítems" />,
+      cell: ({ row }) => (
+        <div className="text-right text-sm">{row.original.items.length}</div>
+      ),
+    },
+    {
+      accessorKey: "total_amount",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Total" />,
+      cell: ({ row }) => (
+        <div className="text-right text-sm font-medium">
+          {formatAmount(row.getValue("total_amount"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "created_at",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Fecha" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {new Date(row.getValue("created_at")).toLocaleDateString("es-BO")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      size: 60,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleViewClick(row.original)}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <div className="space-y-4">
@@ -168,169 +243,95 @@ export function MovementsTable({
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <form onSubmit={handleSearch} className="flex flex-1 gap-2 min-w-[200px]">
-          <Input
-            name="search"
-            placeholder="Buscar por número, destinatario..."
-            defaultValue={currentSearch}
-            className="flex-1"
-          />
-          <Button type="submit" variant="outline" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
+      {/* DataTable */}
+      <DataTable
+        columns={columns}
+        data={movements}
+        toolbar={
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <form onSubmit={handleSearch} className="flex flex-1 gap-2 min-w-[200px]">
+              <Input
+                name="search"
+                placeholder="Buscar por número, destinatario..."
+                defaultValue={currentSearch}
+                className="flex-1"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
 
-        <Select
-          value={currentType}
-          onValueChange={(v) =>
-            pushParams({ movement_type: v === "all" ? undefined : v, page: undefined })
-          }
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            {movementTypeOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={currentStatus}
-          onValueChange={(v) =>
-            pushParams({ status: v === "all" ? undefined : v, page: undefined })
-          }
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            {movementStatusOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            className="w-[145px]"
-            defaultValue={searchParams.get("date_from") ?? ""}
-            onChange={(e) => pushParams({ date_from: e.target.value || undefined, page: undefined })}
-          />
-          <span className="text-muted-foreground text-sm">—</span>
-          <Input
-            type="date"
-            className="w-[145px]"
-            defaultValue={searchParams.get("date_to") ?? ""}
-            onChange={(e) => pushParams({ date_to: e.target.value || undefined, page: undefined })}
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Número</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Destino / Referencia</TableHead>
-              <TableHead className="text-right">Ítems</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead className="w-[60px]">Ver</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {movements.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
-                  No se encontraron movimientos.
-                </TableCell>
-              </TableRow>
-            ) : (
-              movements.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>
-                    <span className="font-mono text-sm font-medium">
-                      {m.movement_number}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getTypeVariant(m.movement_type)} className="text-xs">
-                      {MOVEMENT_TYPE_LABELS[m.movement_type as keyof typeof MOVEMENT_TYPE_LABELS]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(m.status)}>
-                      {MOVEMENT_STATUS_LABELS[m.status as keyof typeof MOVEMENT_STATUS_LABELS]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
-                    {getMovementTarget(m)}
-                  </TableCell>
-                  <TableCell className="text-right text-sm">
-                    {m.items.length}
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-medium">
-                    {formatAmount(m.total_amount)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(m.created_at).toLocaleDateString("es-BO")}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleViewClick(m)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{total} movimiento{total !== 1 ? "s" : ""} en total</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page <= 1}
-              onClick={() => pushParams({ page: String(page - 1) })}
+            <Select
+              value={currentType}
+              onValueChange={(v) =>
+                pushParams({ movement_type: v === "all" ? undefined : v, page: undefined })
+              }
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span>Página {page} de {totalPages}</span>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page >= totalPages}
-              onClick={() => pushParams({ page: String(page + 1) })}
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                {movementTypeOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={currentStatus}
+              onValueChange={(v) =>
+                pushParams({ status: v === "all" ? undefined : v, page: undefined })
+              }
             >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                {movementStatusOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Date range */}
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                className="w-[145px]"
+                defaultValue={searchParams.get("date_from") ?? ""}
+                onChange={(e) => pushParams({ date_from: e.target.value || undefined, page: undefined })}
+              />
+              <span className="text-muted-foreground text-sm">—</span>
+              <Input
+                type="date"
+                className="w-[145px]"
+                defaultValue={searchParams.get("date_to") ?? ""}
+                onChange={(e) => pushParams({ date_to: e.target.value || undefined, page: undefined })}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        }
+        emptyState={
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No se encontraron movimientos.
+          </div>
+        }
+        rowCount={total}
+        pagination={{ pageIndex: page - 1, pageSize: perPage }}
+        onPaginationChange={(updater) => {
+          const next =
+            typeof updater === "function"
+              ? updater({ pageIndex: page - 1, pageSize: perPage })
+              : updater;
+          pushParams({ page: String(next.pageIndex + 1) });
+        }}
+      />
 
       {/* Movement Sheet */}
       <MovementSheet

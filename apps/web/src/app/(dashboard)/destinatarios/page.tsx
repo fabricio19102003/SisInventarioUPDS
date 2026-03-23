@@ -1,4 +1,5 @@
 import { listRecipientsAction } from "@/actions/recipients";
+import { PageTransition } from "@upds/ui";
 import { RecipientsTable } from "./components/recipients-table";
 
 export default async function DestinatariosPage({
@@ -30,11 +31,13 @@ export default async function DestinatariosPage({
   }
 
   return (
-    <RecipientsTable
-      recipients={result.data.recipients}
-      total={result.data.total}
-      page={result.data.page}
-      perPage={result.data.per_page}
-    />
+    <PageTransition>
+      <RecipientsTable
+        recipients={result.data.recipients}
+        total={result.data.total}
+        page={result.data.page}
+        perPage={result.data.per_page}
+      />
+    </PageTransition>
   );
 }

@@ -1,4 +1,5 @@
 import { listUsersAction } from "@/actions/auth";
+import { PageTransition } from "@upds/ui";
 import { UsersTable } from "./components/users-table";
 
 export default async function UsuariosPage({
@@ -30,11 +31,13 @@ export default async function UsuariosPage({
   }
 
   return (
-    <UsersTable
-      users={result.data.users}
-      total={result.data.total}
-      page={result.data.page}
-      perPage={result.data.per_page}
-    />
+    <PageTransition>
+      <UsersTable
+        users={result.data.users}
+        total={result.data.total}
+        page={result.data.page}
+        perPage={result.data.per_page}
+      />
+    </PageTransition>
   );
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getUser } from "@/actions/users";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from "@upds/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, PageTransition } from "@upds/ui";
 import { USER_ROLE_LABELS } from "@upds/validators";
 import { UserActions } from "../_components/user-actions";
 
@@ -18,6 +18,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const u = result.data;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -59,5 +60,6 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
       <Link href="/users"><Button variant="outline">Volver al listado</Button></Link>
     </div>
+    </PageTransition>
   );
 }

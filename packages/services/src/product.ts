@@ -11,10 +11,6 @@ import {
   updateProductSchema,
   addVariantSchema,
   productFiltersSchema,
-  type CreateProductInput,
-  type UpdateProductInput,
-  type AddVariantInput,
-  type ProductFiltersInput,
 } from "@upds/validators";
 import { createAuditLog, diffValues } from "./audit";
 import type { ServiceResult, AuditContext } from "./auth";
@@ -140,7 +136,7 @@ export class ProductService {
    * OFFICE_SUPPLY: Crea 1 variante con size/gender/color en null.
    */
   async createProduct(
-    input: CreateProductInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<ProductData>> {
@@ -267,7 +263,7 @@ export class ProductService {
    * Los campos inmutables (sku, category, garment_type, warehouse_area) NO se tocan.
    */
   async updateProduct(
-    input: UpdateProductInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<ProductData>> {
@@ -417,6 +413,54 @@ export class ProductService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // REACTIVAR PRODUCTO
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async reactivateProduct(
+    productId: string,
+    userId: string,
+    ctx?: AuditContext,
+  ): Promise<ServiceResult<ProductData>> {
+    const product = await this.db.product.findUnique({
+      where: { id: productId },
+      select: { id: true, is_active: true },
+    });
+
+    if (!product) {
+      return { success: false, error: "Producto no encontrado" };
+    }
+
+    if (product.is_active) {
+      return { success: false, error: "El producto ya esta activo" };
+    }
+
+    const updatedProduct = await this.db.$transaction(
+      async (tx: TransactionClient) => {
+        const result = await tx.product.update({
+          where: { id: productId },
+          data: { is_active: true },
+          select: PRODUCT_SELECT,
+        });
+
+        await createAuditLog(tx, {
+          user_id: userId,
+          action: "UPDATE",
+          entity_type: "PRODUCT",
+          entity_id: productId,
+          old_values: { is_active: false },
+          new_values: { is_active: true },
+          ip_address: ctx?.ip_address,
+          user_agent: ctx?.user_agent,
+        });
+
+        return result;
+      },
+    );
+
+    return { success: true, data: updatedProduct as ProductData };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // AGREGAR VARIANTE A PRODUCTO EXISTENTE
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -425,7 +469,7 @@ export class ProductService {
    * No se puede agregar variantes a OFFICE_SUPPLY (ya tiene su unica variante).
    */
   async addVariant(
-    input: AddVariantInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<ProductVariantData>> {
@@ -578,6 +622,65 @@ export class ProductService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // REACTIVAR VARIANTE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async reactivateVariant(
+    variantId: string,
+    userId: string,
+    ctx?: AuditContext,
+  ): Promise<ServiceResult<ProductVariantData>> {
+    const variant = await this.db.productVariant.findUnique({
+      where: { id: variantId },
+      select: {
+        id: true,
+        is_active: true,
+        product: { select: { is_active: true } },
+      },
+    });
+
+    if (!variant) {
+      return { success: false, error: "Variante no encontrada" };
+    }
+
+    if (variant.is_active) {
+      return { success: false, error: "La variante ya esta activa" };
+    }
+
+    if (!variant.product.is_active) {
+      return {
+        success: false,
+        error: "No se puede reactivar una variante de un producto desactivado",
+      };
+    }
+
+    const updatedVariant = await this.db.$transaction(
+      async (tx: TransactionClient) => {
+        const result = await tx.productVariant.update({
+          where: { id: variantId },
+          data: { is_active: true },
+          select: VARIANT_SELECT,
+        });
+
+        await createAuditLog(tx, {
+          user_id: userId,
+          action: "UPDATE",
+          entity_type: "PRODUCT_VARIANT",
+          entity_id: variantId,
+          old_values: { is_active: false },
+          new_values: { is_active: true },
+          ip_address: ctx?.ip_address,
+          user_agent: ctx?.user_agent,
+        });
+
+        return result;
+      },
+    );
+
+    return { success: true, data: updatedVariant as ProductVariantData };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // OBTENER PRODUCTO POR ID
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -598,7 +701,7 @@ export class ProductService {
   // LISTAR PRODUCTOS CON FILTROS Y PAGINACION
   // ─────────────────────────────────────────────────────────────────────────
 
-  async listProducts(input?: ProductFiltersInput): Promise<
+  async listProducts(input?: unknown): Promise<
     ServiceResult<{
       products: ProductData[];
       total: number;

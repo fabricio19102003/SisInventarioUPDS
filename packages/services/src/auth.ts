@@ -12,12 +12,6 @@ import {
   changePasswordSchema,
   adminResetPasswordSchema,
   userFiltersSchema,
-  type LoginInput,
-  type CreateUserInput,
-  type UpdateUserInput,
-  type ChangePasswordInput,
-  type AdminResetPasswordInput,
-  type UserFiltersInput,
 } from "@upds/validators";
 import bcrypt from "bcryptjs";
 import { createAuditLog, diffValues } from "./audit";
@@ -85,7 +79,7 @@ export class AuthService {
    * Retorna el usuario sin password_hash si las credenciales son correctas.
    */
   async login(
-    input: LoginInput,
+    input: unknown,
     ctx?: AuditContext,
   ): Promise<ServiceResult<SafeUser>> {
     const parsed = loginSchema.safeParse(input);
@@ -153,7 +147,7 @@ export class AuthService {
    * El password se hashea antes de almacenar.
    */
   async createUser(
-    input: CreateUserInput,
+    input: unknown,
     adminId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<SafeUser>> {
@@ -215,7 +209,7 @@ export class AuthService {
    * Registra solo los campos que realmente cambiaron.
    */
   async updateUser(
-    input: UpdateUserInput,
+    input: unknown,
     adminId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<SafeUser>> {
@@ -410,7 +404,7 @@ export class AuthService {
    * Requiere la contrasena actual para validar identidad.
    */
   async changePassword(
-    input: ChangePasswordInput,
+    input: unknown,
     ctx?: AuditContext,
   ): Promise<ServiceResult<{ message: string }>> {
     const parsed = changePasswordSchema.safeParse(input);
@@ -477,7 +471,7 @@ export class AuthService {
    * sin necesidad de conocer la contrasena actual.
    */
   async adminResetPassword(
-    input: AdminResetPasswordInput,
+    input: unknown,
     adminId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<{ message: string }>> {
@@ -546,7 +540,7 @@ export class AuthService {
   // LISTAR USUARIOS CON FILTROS Y PAGINACION
   // ─────────────────────────────────────────────────────────────────────────
 
-  async listUsers(input?: UserFiltersInput): Promise<
+  async listUsers(input?: unknown): Promise<
     ServiceResult<{
       users: SafeUser[];
       total: number;

@@ -9,9 +9,6 @@ import {
   createDepartmentSchema,
   updateDepartmentSchema,
   departmentFiltersSchema,
-  type CreateDepartmentInput,
-  type UpdateDepartmentInput,
-  type DepartmentFiltersInput,
 } from "@upds/validators";
 import { createAuditLog, diffValues } from "./audit";
 import type { ServiceResult, AuditContext } from "./auth";
@@ -46,7 +43,7 @@ export class DepartmentService {
   constructor(private readonly db: PrismaClient) {}
 
   async create(
-    input: CreateDepartmentInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<DepartmentData>> {
@@ -111,7 +108,7 @@ export class DepartmentService {
   }
 
   async update(
-    input: UpdateDepartmentInput,
+    input: unknown,
     userId: string,
     ctx?: AuditContext,
   ): Promise<ServiceResult<DepartmentData>> {
@@ -218,6 +215,21 @@ export class DepartmentService {
       return { success: false, error: "El departamento ya esta desactivado" };
     }
 
+    // Verificar que no tiene movimientos DRAFT pendientes
+    const pendingMovements = await this.db.inventoryMovement.count({
+      where: {
+        department_id: departmentId,
+        status: "DRAFT",
+      },
+    });
+
+    if (pendingMovements > 0) {
+      return {
+        success: false,
+        error: `No se puede desactivar el departamento: tiene ${pendingMovements} entrega(s) pendiente(s) de confirmar o cancelar`,
+      };
+    }
+
     const updated = await this.db.$transaction(
       async (tx: TransactionClient) => {
         const result = await tx.department.update({
@@ -257,7 +269,7 @@ export class DepartmentService {
     return { success: true, data: department as DepartmentData };
   }
 
-  async list(input?: DepartmentFiltersInput): Promise<
+  async list(input?: unknown): Promise<
     ServiceResult<{
       departments: DepartmentData[];
       total: number;

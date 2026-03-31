@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Toaster, ThemeProvider } from "@upds/ui";
 import "@upds/ui/globals.css";
 
+const inter = Inter({ subsets: ["latin"] });
+
 export const metadata: Metadata = {
-  title: "Sistema de Inventario UPDS",
-  description: "Control de inventarios - Universidad Privada Domingo Savio",
+  title: "Sistema de Inventario — UPDS",
+  description:
+    "Sistema de gestion de inventario de la Universidad Privada Domingo Savio",
 };
 
 export default function RootLayout({
@@ -12,8 +17,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body>{children}</body>
+    <html lang="es" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

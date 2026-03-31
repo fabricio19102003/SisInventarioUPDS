@@ -15,7 +15,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx src/seed.ts",
+    "db:seed": "node --env-file=.env --import=tsx src/seed.ts",
     "db:studio": "prisma studio",
     "type-check": "tsc --noEmit",
     "clean": "rimraf node_modules .turbo generated"
@@ -24,7 +24,9 @@
     "@prisma/client": "^6.1.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.10.5",
+    "bcryptjs": "^3.0.3",
     "prisma": "^6.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

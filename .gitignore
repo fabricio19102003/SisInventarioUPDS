@@ -29,3 +29,9 @@ prisma/*.db
 # OS
 .DS_Store
 Thumbs.db
+
+# turbo cache
+.turbo/
+
+# IDE
+.vscode/settings.json

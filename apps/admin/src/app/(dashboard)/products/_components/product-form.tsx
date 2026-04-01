@@ -12,6 +12,7 @@ import {
   GarmentType, GARMENT_TYPE_LABELS, WarehouseArea, WAREHOUSE_AREA_LABELS,
   Size, SIZE_LABELS, Gender, GENDER_LABELS,
 } from "@upds/validators";
+import type { CreateMedicalVariantInput, CreateProductInput } from "@upds/validators";
 
 const categoryOptions = enumToOptions(ProductCategory, PRODUCT_CATEGORY_LABELS);
 const garmentOptions = enumToOptions(GarmentType, GARMENT_TYPE_LABELS);
@@ -19,21 +20,23 @@ const warehouseOptions = enumToOptions(WarehouseArea, WAREHOUSE_AREA_LABELS);
 const sizeOptions = enumToOptions(Size, SIZE_LABELS);
 const genderOptions = enumToOptions(Gender, GENDER_LABELS);
 
+type ProductVariantField = keyof CreateMedicalVariantInput;
+type ProductCategoryValue = CreateProductInput["category"];
+type GarmentTypeValue = NonNullable<CreateProductInput["garment_type"]>;
+type WarehouseAreaValue = CreateProductInput["warehouse_area"];
+
 export function ProductForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [category, setCategory] = useState<string>("MEDICAL_GARMENT");
-  const [garmentType, setGarmentType] = useState<string>("PIJAMA");
-  const [warehouseArea, setWarehouseArea] = useState<string>("MEDICAL");
+  const [category, setCategory] = useState<ProductCategoryValue>("MEDICAL_GARMENT");
+  const [garmentType, setGarmentType] = useState<GarmentTypeValue>("PIJAMA");
+  const [warehouseArea, setWarehouseArea] = useState<WarehouseAreaValue>("MEDICAL");
 
   // Variants for medical garments
-  const [variants, setVariants] = useState<Array<{ size: string; gender: string; color: string; initial_stock: number }>>([
+  const [variants, setVariants] = useState<CreateMedicalVariantInput[]>([
     { size: "M", gender: "UNISEX", color: "", initial_stock: 0 },
   ]);
-
-  // Single stock for office supply
-  const [officeStock, setOfficeStock] = useState(0);
 
   function addVariant() {
     setVariants([...variants, { size: "M", gender: "UNISEX", color: "", initial_stock: 0 }]);
@@ -43,9 +46,13 @@ export function ProductForm() {
     setVariants(variants.filter((_, i) => i !== idx));
   }
 
-  function updateVariant(idx: number, field: string, value: any) {
+  function updateVariant<K extends ProductVariantField>(
+    idx: number,
+    field: K,
+    value: CreateMedicalVariantInput[K],
+  ) {
     const updated = [...variants];
-    (updated[idx] as any)[field] = value;
+    updated[idx] = { ...updated[idx], [field]: value } as CreateMedicalVariantInput;
     setVariants(updated);
   }
 
@@ -56,7 +63,7 @@ export function ProductForm() {
 
     const isMedical = category === "MEDICAL_GARMENT";
 
-    const data: any = {
+    const data: CreateProductInput = {
       sku: fd.get("sku") as string,
       name: fd.get("name") as string,
       description: (fd.get("description") as string) || undefined,
@@ -64,9 +71,8 @@ export function ProductForm() {
       garment_type: isMedical ? garmentType : undefined,
       warehouse_area: warehouseArea,
       min_stock: Number(fd.get("min_stock")) || 5,
-      variants: isMedical
-        ? variants.map((v) => ({ size: v.size, gender: v.gender, color: v.color, initial_stock: v.initial_stock }))
-        : [{ initial_stock: officeStock }],
+      variants: isMedical ? variants : undefined,
+      initial_stock: 0,
     };
 
     startTransition(async () => {
@@ -109,10 +115,10 @@ export function ProductForm() {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Categoría *</Label>
-              <Select value={category} onValueChange={(v) => {
-                setCategory(v);
-                setWarehouseArea(v === "MEDICAL_GARMENT" ? "MEDICAL" : "OFFICE");
-              }}>
+                <Select value={category} onValueChange={(v) => {
+                  setCategory(v as ProductCategoryValue);
+                  setWarehouseArea(v === "MEDICAL_GARMENT" ? "MEDICAL" : "OFFICE");
+                }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {categoryOptions.map((o) => (
@@ -125,7 +131,7 @@ export function ProductForm() {
             {isMedical && (
               <div className="space-y-2">
                 <Label>Tipo Prenda *</Label>
-                <Select value={garmentType} onValueChange={setGarmentType}>
+                <Select value={garmentType} onValueChange={(value) => setGarmentType(value as GarmentTypeValue)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {garmentOptions.map((o) => (
@@ -138,7 +144,7 @@ export function ProductForm() {
 
             <div className="space-y-2">
               <Label>Área Almacén *</Label>
-              <Select value={warehouseArea} onValueChange={setWarehouseArea}>
+               <Select value={warehouseArea} onValueChange={(value) => setWarehouseArea(value as WarehouseAreaValue)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {warehouseOptions.map((o) => (
@@ -161,10 +167,10 @@ export function ProductForm() {
                 <Button type="button" variant="outline" size="sm" onClick={addVariant}>+ Agregar Variante</Button>
               </div>
               {variants.map((v, idx) => (
-                <div key={idx} className="grid grid-cols-5 gap-3 items-end p-3 bg-gray-50 rounded border">
+                <div key={idx} className="grid grid-cols-4 gap-3 items-end p-3 bg-gray-50 rounded border">
                   <div className="space-y-1">
                     <Label className="text-xs">Talla</Label>
-                    <Select value={v.size} onValueChange={(val) => updateVariant(idx, "size", val)}>
+                     <Select value={v.size} onValueChange={(val) => updateVariant(idx, "size", val as CreateMedicalVariantInput["size"])}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {sizeOptions.map((o) => (
@@ -175,7 +181,7 @@ export function ProductForm() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Género</Label>
-                    <Select value={v.gender} onValueChange={(val) => updateVariant(idx, "gender", val)}>
+                     <Select value={v.gender} onValueChange={(val) => updateVariant(idx, "gender", val as CreateMedicalVariantInput["gender"])}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {genderOptions.map((o) => (
@@ -192,14 +198,6 @@ export function ProductForm() {
                       placeholder="Ej: Azul"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Stock Inicial</Label>
-                    <Input
-                      type="number" min={0}
-                      value={v.initial_stock}
-                      onChange={(e) => updateVariant(idx, "initial_stock", Number(e.target.value))}
-                    />
-                  </div>
                   <Button
                     type="button" variant="ghost" size="sm"
                     onClick={() => removeVariant(idx)}
@@ -212,13 +210,8 @@ export function ProductForm() {
               ))}
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label>Stock Inicial</Label>
-              <Input
-                type="number" min={0} className="w-32"
-                value={officeStock}
-                onChange={(e) => setOfficeStock(Number(e.target.value))}
-              />
+            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              El producto se crea con stock 0. Para cargar existencias iniciales usá un movimiento de ajuste o una entrada.
             </div>
           )}
 

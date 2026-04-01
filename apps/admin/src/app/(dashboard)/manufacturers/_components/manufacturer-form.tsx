@@ -13,6 +13,7 @@ import {
   Textarea,
 } from "@upds/ui";
 import { createManufacturer, updateManufacturer } from "@/actions/manufacturers";
+import type { CreateManufacturerInput, UpdateManufacturerInput } from "@upds/validators";
 
 interface ManufacturerFormProps {
   manufacturer?: {
@@ -36,8 +37,7 @@ export function ManufacturerForm({ manufacturer }: ManufacturerFormProps) {
     setError(null);
     const formData = new FormData(e.currentTarget);
 
-    const data = {
-      ...(isEdit ? { id: manufacturer.id } : {}),
+    const baseData = {
       name: formData.get("name") as string,
       contact_name: (formData.get("contact_name") as string) || undefined,
       phone: (formData.get("phone") as string) || undefined,
@@ -47,8 +47,8 @@ export function ManufacturerForm({ manufacturer }: ManufacturerFormProps) {
 
     startTransition(async () => {
       const result = isEdit
-        ? await updateManufacturer(data as any)
-        : await createManufacturer(data as any);
+        ? await updateManufacturer({ id: manufacturer.id, ...baseData } satisfies UpdateManufacturerInput)
+        : await createManufacturer(baseData satisfies CreateManufacturerInput);
 
       if (result.success) {
         router.push(isEdit ? `/manufacturers/${manufacturer.id}` : "/manufacturers");

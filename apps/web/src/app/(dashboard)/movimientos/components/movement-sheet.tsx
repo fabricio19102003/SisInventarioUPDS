@@ -108,8 +108,6 @@ type CreateValues = z.infer<typeof createSchema>;
 // Helpers
 // ---------------------------------------------------------------------------
 
-const movementTypeOptions = enumToOptions(MovementType, MOVEMENT_TYPE_LABELS);
-
 function getStatusVariant(status: string): "default" | "secondary" | "destructive" {
   if (status === "CONFIRMED") return "default";
   if (status === "CANCELLED") return "destructive";

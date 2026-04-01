@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { ProductData, ProductVariantData } from "@upds/services";
 import {
   SIZE_LABELS,
-  GENDER_LABELS,
   PRODUCT_CATEGORY_LABELS,
 } from "@upds/validators";
 import {
@@ -39,6 +38,7 @@ import {
   reactivateVariantAction,
 } from "@/actions/products";
 import { AddVariantForm } from "./add-variant-form";
+import { InitialStockButton } from "./initial-stock-button";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -164,7 +164,7 @@ export function ProductVariantsSheet({
                   )}
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="w-[80px]">Acciones</TableHead>
+                  <TableHead className="w-[190px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -220,12 +220,18 @@ export function ProductVariantsSheet({
                             {v.is_active ? "Activa" : "Inactiva"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {v.is_active ? (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
+                          <TableCell>
+                           <div className="flex items-center justify-end gap-2">
+                           <InitialStockButton
+                             productVariantId={v.id}
+                             productLabel={`${product.sku}-${v.sku_suffix}`}
+                             disabled={!product.is_active || !v.is_active}
+                           />
+                           {v.is_active ? (
+                             <AlertDialog>
+                               <AlertDialogTrigger asChild>
+                                 <Button
+                                   variant="ghost"
                                   size="icon"
                                   disabled={isPending}
                                 >
@@ -256,20 +262,21 @@ export function ProductVariantsSheet({
                                   >
                                     Desactivar
                                   </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          ) : (
-                            <Button
-                              variant="ghost"
+                                 </AlertDialogFooter>
+                               </AlertDialogContent>
+                             </AlertDialog>
+                           ) : (
+                             <Button
+                               variant="ghost"
                               size="icon"
                               disabled={isPending || !product.is_active}
                               onClick={() => handleReactivateVariant(v.id)}
                             >
-                              <RotateCcw className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                        </TableCell>
+                               <RotateCcw className="h-4 w-4 text-green-600" />
+                             </Button>
+                           )}
+                           </div>
+                          </TableCell>
                       </TableRow>
                     );
                   })

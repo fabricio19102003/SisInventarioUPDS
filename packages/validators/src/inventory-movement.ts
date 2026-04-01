@@ -1,106 +1,87 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // @upds/validators — Schemas de Movimientos de Inventario
-// Validacion condicional por tipo de movimiento usando superRefine.
-// Cada tipo tiene sus campos obligatorios y restricciones especificas.
+// Validacion estricta por tipo de movimiento usando discriminatedUnion.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { z } from "zod";
-import { MovementTypeSchema, MovementStatusSchema } from "./enums";
+import { MovementStatusSchema } from "./enums";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Crear movimiento (cabecera)
-// ─────────────────────────────────────────────────────────────────────────────
+const uuidField = (message: string) => z.string().uuid(message);
 
-export const createMovementSchema = z
-  .object({
-    movement_type: MovementTypeSchema,
-    recipient_id: z.string().uuid("ID de destinatario invalido").optional(),
-    department_id: z.string().uuid("ID de departamento invalido").optional(),
-    manufacture_order_id: z
-      .string()
-      .uuid("ID de orden de fabricacion invalido")
-      .optional(),
-    notes: z.string().max(5000, "Las notas no pueden exceder 5000 caracteres").optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.movement_type === "SALE") {
-      if (!data.recipient_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El destinatario es obligatorio para ventas",
-          path: ["recipient_id"],
-        });
-      }
-    }
+const optionalNotes = z
+  .string()
+  .max(5000, "Las notas no pueden exceder 5000 caracteres")
+  .optional();
 
-    if (data.movement_type === "DONATION") {
-      if (!data.recipient_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El destinatario es obligatorio para dotaciones",
-          path: ["recipient_id"],
-        });
-      }
-    }
+const requiredNotes = z
+  .string()
+  .min(10, "Las notas son obligatorias (minimo 10 caracteres)")
+  .max(5000, "Las notas no pueden exceder 5000 caracteres");
 
-    if (data.movement_type === "ENTRY") {
-      if (!data.manufacture_order_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "La orden de fabricacion es obligatoria para entradas",
-          path: ["manufacture_order_id"],
-        });
-      }
-    }
+const entryMovementSchema = z.object({
+  movement_type: z.literal("ENTRY"),
+  recipient_id: z.undefined().optional(),
+  department_id: z.undefined().optional(),
+  manufacture_order_id: uuidField("ID de orden de fabricacion invalido"),
+  notes: optionalNotes,
+});
 
-    if (data.movement_type === "DEPARTMENT_DELIVERY") {
-      if (!data.department_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "El departamento es obligatorio para entregas a departamento",
-          path: ["department_id"],
-        });
-      }
-    }
+const saleMovementSchema = z.object({
+  movement_type: z.literal("SALE"),
+  recipient_id: uuidField("ID de destinatario invalido"),
+  department_id: z.undefined().optional(),
+  manufacture_order_id: z.undefined().optional(),
+  notes: optionalNotes,
+});
 
-    if (data.movement_type === "WRITE_OFF") {
-      if (!data.notes || data.notes.trim().length < 10) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Las notas son obligatorias para bajas (minimo 10 caracteres)",
-          path: ["notes"],
-        });
-      }
-    }
+const donationMovementSchema = z.object({
+  movement_type: z.literal("DONATION"),
+  recipient_id: uuidField("ID de destinatario invalido"),
+  department_id: z.undefined().optional(),
+  manufacture_order_id: z.undefined().optional(),
+  notes: optionalNotes,
+});
 
-    if (data.movement_type === "ADJUSTMENT") {
-      if (!data.notes || data.notes.trim().length < 10) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Las notas son obligatorias para ajustes (minimo 10 caracteres)",
-          path: ["notes"],
-        });
-      }
-    }
-  });
+const writeOffMovementSchema = z.object({
+  movement_type: z.literal("WRITE_OFF"),
+  recipient_id: z.undefined().optional(),
+  department_id: z.undefined().optional(),
+  manufacture_order_id: z.undefined().optional(),
+  notes: requiredNotes,
+});
+
+const adjustmentMovementSchema = z.object({
+  movement_type: z.literal("ADJUSTMENT"),
+  recipient_id: z.undefined().optional(),
+  department_id: z.undefined().optional(),
+  manufacture_order_id: z.undefined().optional(),
+  notes: requiredNotes,
+});
+
+const departmentDeliveryMovementSchema = z.object({
+  movement_type: z.literal("DEPARTMENT_DELIVERY"),
+  recipient_id: z.undefined().optional(),
+  department_id: uuidField("ID de departamento invalido"),
+  manufacture_order_id: z.undefined().optional(),
+  notes: optionalNotes,
+});
+
+export const createMovementSchema = z.discriminatedUnion("movement_type", [
+  entryMovementSchema,
+  saleMovementSchema,
+  donationMovementSchema,
+  writeOffMovementSchema,
+  adjustmentMovementSchema,
+  departmentDeliveryMovementSchema,
+]);
 
 export type CreateMovementInput = z.infer<typeof createMovementSchema>;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Agregar item a movimiento
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const addMovementItemSchema = z
   .object({
     movement_id: z.string().uuid("ID de movimiento invalido"),
     product_variant_id: z.string().uuid("ID de variante invalido"),
-    quantity: z.coerce
-      .number()
-      .int("La cantidad debe ser un numero entero"),
+    quantity: z.coerce.number().int("La cantidad debe ser un numero entero"),
     unit_price: z.coerce
       .number()
       .min(0, "El precio unitario no puede ser negativo")
@@ -119,19 +100,11 @@ export const addMovementItemSchema = z
 
 export type AddMovementItemInput = z.infer<typeof addMovementItemSchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Confirmar movimiento
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const confirmMovementSchema = z.object({
   movement_id: z.string().uuid("ID de movimiento invalido"),
 });
 
 export type ConfirmMovementInput = z.infer<typeof confirmMovementSchema>;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Cancelar movimiento
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const cancelMovementSchema = z.object({
   movement_id: z.string().uuid("ID de movimiento invalido"),
@@ -143,13 +116,18 @@ export const cancelMovementSchema = z.object({
 
 export type CancelMovementInput = z.infer<typeof cancelMovementSchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Filtros de listado
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const movementFiltersSchema = z.object({
   search: z.string().max(255).optional(),
-  movement_type: MovementTypeSchema.optional(),
+  movement_type: z
+    .enum([
+      "ENTRY",
+      "SALE",
+      "DONATION",
+      "WRITE_OFF",
+      "ADJUSTMENT",
+      "DEPARTMENT_DELIVERY",
+    ])
+    .optional(),
   status: MovementStatusSchema.optional(),
   date_from: z.coerce.date().optional(),
   date_to: z.coerce.date().optional(),

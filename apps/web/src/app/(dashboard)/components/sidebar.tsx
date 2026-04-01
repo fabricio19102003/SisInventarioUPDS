@@ -88,6 +88,8 @@ function SidebarContent({
   userName,
   userRole,
   onLinkClick,
+  onLogout,
+  isLoggingOut,
 }: {
   pathname: string;
   userName: string;

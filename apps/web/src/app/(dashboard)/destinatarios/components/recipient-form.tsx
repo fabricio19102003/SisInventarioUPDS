@@ -132,7 +132,8 @@ export function RecipientForm({
 
       // document_number es inmutable al editar — lo removemos del payload
       if (isEditing) {
-        const { document_number: _, ...updatePayload } = payload;
+        const { document_number, ...updatePayload } = payload;
+        void document_number;
         const result = await updateRecipientAction(updatePayload);
         if (!result.success) {
           toast({ title: "Error", description: result.error, variant: "destructive" });

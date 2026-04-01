@@ -11,6 +11,8 @@ import {
   GENDER_LABELS,
 } from "@upds/validators";
 import { ProductActions } from "../_components/product-actions";
+import { InitialStockButton } from "../_components/initial-stock-button";
+import type { ProductVariantData } from "@upds/services";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,10 +82,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 {isMedical && <TableHead>Color</TableHead>}
                 <TableHead className="text-right">Stock Actual</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Carga inicial</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(p.variants ?? []).map((v: any) => {
+              {(p.variants ?? []).map((v: ProductVariantData) => {
                 const lowStock = v.current_stock < p.min_stock;
                 return (
                   <TableRow key={v.id} className={lowStock ? "bg-orange-50" : ""}>
@@ -105,6 +108,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                       <Badge variant={v.is_active ? "default" : "secondary"}>
                         {v.is_active ? "Activo" : "Inactivo"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <InitialStockButton
+                        productVariantId={v.id}
+                        productLabel={`${p.sku}-${v.sku_suffix}`}
+                        disabled={!p.is_active || !v.is_active}
+                      />
                     </TableCell>
                   </TableRow>
                 );

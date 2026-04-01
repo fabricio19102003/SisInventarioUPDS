@@ -12,9 +12,15 @@ import {
 } from "@upds/ui";
 import { addMovementItem, removeMovementItem, confirmMovement, cancelMovement } from "@/actions/inventory-movements";
 import { getProducts } from "@/actions/products";
+import type { MovementData, ProductData, ProductVariantData } from "@upds/services";
 
 interface MovementActionsProps {
-  movement: any;
+  movement: MovementData;
+}
+
+interface VariantOption {
+  id: string;
+  label: string;
 }
 
 export function MovementActions({ movement }: MovementActionsProps) {
@@ -51,12 +57,12 @@ export function RemoveItemButton({ movementId, itemId }: { movementId: string; i
   );
 }
 
-function AddItemDialog({ movement }: { movement: any }) {
+function AddItemDialog({ movement }: { movement: MovementData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [variants, setVariants] = useState<any[]>([]);
+  const [variants, setVariants] = useState<VariantOption[]>([]);
   const [variantId, setVariantId] = useState("");
 
   const isSale = movement.movement_type === "SALE";
@@ -67,9 +73,11 @@ function AddItemDialog({ movement }: { movement: any }) {
     if (open) {
       getProducts({ is_active: true }).then((r) => {
         if (r.success) {
-          const all: any[] = [];
-          r.data.products.forEach((p: any) => {
-            (p.variants ?? []).filter((v: any) => v.is_active).forEach((v: any) => {
+          const all: VariantOption[] = [];
+          r.data.products.forEach((p: ProductData) => {
+            (p.variants ?? [])
+              .filter((v: ProductVariantData) => v.is_active)
+              .forEach((v: ProductVariantData) => {
               all.push({
                 id: v.id,
                 label: `${p.sku}-${v.sku_suffix} (${p.name}${v.size ? ` ${v.size}` : ""}${v.color ? ` ${v.color}` : ""}) — Stock: ${v.current_stock}`,
@@ -92,7 +100,7 @@ function AddItemDialog({ movement }: { movement: any }) {
         movement_id: movement.id,
         product_variant_id: variantId,
         quantity: Number(fd.get("quantity")),
-        unit_price: showPrice ? Number(fd.get("unit_price")) : undefined,
+        unit_price: showPrice ? Number(fd.get("unit_price")) : 0,
       });
       if (result.success) {
         setOpen(false);

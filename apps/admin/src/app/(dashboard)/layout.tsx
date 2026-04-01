@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { type UserRole } from "@upds/validators";
 import { Breadcrumbs, Separator, ThemeToggle } from "@upds/ui";
 import { SidebarNav, type NavSection } from "./_components/sidebar-nav";
 import { MobileSidebar } from "./_components/mobile-sidebar";

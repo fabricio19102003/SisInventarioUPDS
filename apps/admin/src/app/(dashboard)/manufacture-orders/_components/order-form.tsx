@@ -8,12 +8,13 @@ import {
 } from "@upds/ui";
 import { createManufactureOrder } from "@/actions/manufacture-orders";
 import { getManufacturers } from "@/actions/manufacturers";
+import type { ManufacturerData } from "@upds/services";
 
 export function OrderForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [manufacturers, setManufacturers] = useState<any[]>([]);
+  const [manufacturers, setManufacturers] = useState<ManufacturerData[]>([]);
   const [manufacturerId, setManufacturerId] = useState("");
 
   useEffect(() => {
@@ -28,11 +29,13 @@ export function OrderForm() {
     const fd = new FormData(e.currentTarget);
 
     startTransition(async () => {
-      const result = await createManufactureOrder({
-        manufacturer_id: manufacturerId,
-        expected_at: (fd.get("expected_at") as string) || undefined,
-        notes: (fd.get("notes") as string) || undefined,
-      });
+        const result = await createManufactureOrder({
+          manufacturer_id: manufacturerId,
+          expected_at: fd.get("expected_at")
+            ? new Date(fd.get("expected_at") as string)
+            : undefined,
+          notes: (fd.get("notes") as string) || undefined,
+        });
       if (result.success) {
         router.push(`/manufacture-orders/${result.data.id}`);
       } else {
@@ -53,7 +56,7 @@ export function OrderForm() {
             <Select value={manufacturerId} onValueChange={setManufacturerId}>
               <SelectTrigger><SelectValue placeholder="Seleccionar fabricante..." /></SelectTrigger>
               <SelectContent>
-                {manufacturers.map((m: any) => (
+                {manufacturers.map((m) => (
                   <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                 ))}
               </SelectContent>

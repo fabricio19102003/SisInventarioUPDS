@@ -8,18 +8,27 @@ import {
 } from "@upds/ui";
 import { createUser, updateUser } from "@/actions/users";
 import { enumToOptions, UserRole, USER_ROLE_LABELS } from "@upds/validators";
+import type { UserRole as UserRoleValue } from "@upds/validators";
 
 const roleOptions = enumToOptions(UserRole, USER_ROLE_LABELS);
 
 interface UserFormProps {
-  user?: { id: string; email: string; full_name: string; role: string };
+  user?: {
+    id: string;
+    email: string;
+    full_name: string;
+    role: string;
+    is_active: boolean;
+  };
 }
 
 export function UserForm({ user }: UserFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [role, setRole] = useState(user?.role ?? "VIEWER");
+  const [role, setRole] = useState<UserRoleValue>(
+    (user?.role as UserRoleValue | undefined) ?? "VIEWER",
+  );
   const isEdit = !!user;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -33,7 +42,8 @@ export function UserForm({ user }: UserFormProps) {
           id: user.id,
           email: fd.get("email") as string,
           full_name: fd.get("full_name") as string,
-          role: role as any,
+          role,
+          is_active: user.is_active,
         });
         if (result.success) router.push(`/users/${user.id}`);
         else setError(result.error);
@@ -47,13 +57,13 @@ export function UserForm({ user }: UserFormProps) {
       }
 
       startTransition(async () => {
-        const result = await createUser({
-          email: fd.get("email") as string,
-          full_name: fd.get("full_name") as string,
-          password,
-          password_confirm,
-          role: role as any,
-        });
+          const result = await createUser({
+            email: fd.get("email") as string,
+            full_name: fd.get("full_name") as string,
+            password,
+            password_confirm,
+            role,
+          });
         if (result.success) router.push("/users");
         else setError(result.error);
       });
@@ -79,7 +89,7 @@ export function UserForm({ user }: UserFormProps) {
 
           <div className="space-y-2">
             <Label>Rol *</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Select value={role} onValueChange={(value) => setRole(value as UserRoleValue)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {roleOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}

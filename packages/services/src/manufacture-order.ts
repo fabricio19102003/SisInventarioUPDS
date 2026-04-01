@@ -4,7 +4,7 @@
 // Al recibir items se crea un InventoryMovement ENTRY y se actualiza stock.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { type PrismaClient, type TransactionClient, type Prisma } from "@upds/db";
+import { type PrismaClient, type TransactionClient, Prisma } from "@upds/db";
 import {
   createManufactureOrderSchema,
   addOrderItemSchema,
@@ -198,38 +198,36 @@ export class ManufactureOrderService {
       };
     }
 
-    const order = await this.db.$transaction(
-      async (tx: TransactionClient) => {
-        const orderNumber = await generateOrderNumber(tx);
+    const order = await this.db.$transaction(async (tx: TransactionClient) => {
+      const orderNumber = await generateOrderNumber(tx);
 
-        const created = await tx.manufactureOrder.create({
-          data: {
-            order_number: orderNumber,
-            manufacturer_id: data.manufacturer_id,
-            status: "PENDING",
-            notes: data.notes ?? null,
-            expected_at: data.expected_at ?? null,
-          },
-          select: ORDER_SELECT,
-        });
+      const created = await tx.manufactureOrder.create({
+        data: {
+          order_number: orderNumber,
+          manufacturer_id: data.manufacturer_id,
+          status: "PENDING",
+          notes: data.notes ?? null,
+          expected_at: data.expected_at ?? null,
+        },
+        select: ORDER_SELECT,
+      });
 
-        await createAuditLog(tx, {
-          user_id: userId,
-          action: "CREATE",
-          entity_type: "MANUFACTURE_ORDER",
-          entity_id: created.id,
-          new_values: {
-            order_number: created.order_number,
-            manufacturer: manufacturer.name,
-            status: "PENDING",
-          },
-          ip_address: ctx?.ip_address,
-          user_agent: ctx?.user_agent,
-        });
+      await createAuditLog(tx, {
+        user_id: userId,
+        action: "CREATE",
+        entity_type: "MANUFACTURE_ORDER",
+        entity_id: created.id,
+        new_values: {
+          order_number: created.order_number,
+          manufacturer: manufacturer.name,
+          status: "PENDING",
+        },
+        ip_address: ctx?.ip_address,
+        user_agent: ctx?.user_agent,
+      });
 
-        return created;
-      },
-    );
+      return created;
+    });
 
     return { success: true, data: order as ManufactureOrderData };
   }
@@ -335,6 +333,9 @@ export class ManufactureOrderService {
 
         return result;
       },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
     );
 
     return { success: true, data: updatedOrder as ManufactureOrderData };
@@ -424,7 +425,12 @@ export class ManufactureOrderService {
   ): Promise<ServiceResult<ManufactureOrderData>> {
     const order = await this.db.manufactureOrder.findUnique({
       where: { id: orderId },
-      select: { id: true, status: true, order_number: true, items: { select: { id: true } } },
+      select: {
+        id: true,
+        status: true,
+        order_number: true,
+        items: { select: { id: true } },
+      },
     });
 
     if (!order) {
@@ -434,7 +440,8 @@ export class ManufactureOrderService {
     if (order.status !== "PENDING") {
       return {
         success: false,
-        error: "Solo se puede iniciar produccion de ordenes en estado PENDIENTE",
+        error:
+          "Solo se puede iniciar produccion de ordenes en estado PENDIENTE",
       };
     }
 
@@ -514,7 +521,8 @@ export class ManufactureOrderService {
     if (order.status !== "PENDING" && order.status !== "IN_PROGRESS") {
       return {
         success: false,
-        error: "Solo se pueden recibir items de ordenes PENDIENTES o EN PROGRESO",
+        error:
+          "Solo se pueden recibir items de ordenes PENDIENTES o EN PROGRESO",
       };
     }
 
@@ -685,7 +693,8 @@ export class ManufactureOrderService {
     if (order.status !== "PENDING" && order.status !== "IN_PROGRESS") {
       return {
         success: false,
-        error: "Solo se pueden cancelar ordenes en estado PENDIENTE o EN PROGRESO",
+        error:
+          "Solo se pueden cancelar ordenes en estado PENDIENTE o EN PROGRESO",
       };
     }
 
@@ -726,9 +735,7 @@ export class ManufactureOrderService {
   // OBTENER ORDEN POR ID
   // ─────────────────────────────────────────────────────────────────────────
 
-  async getOrderById(
-    id: string,
-  ): Promise<ServiceResult<ManufactureOrderData>> {
+  async getOrderById(id: string): Promise<ServiceResult<ManufactureOrderData>> {
     const order = await this.db.manufactureOrder.findUnique({
       where: { id },
       select: ORDER_SELECT,
@@ -761,8 +768,15 @@ export class ManufactureOrderService {
       };
     }
 
-    const { search, status, manufacturer_id, date_from, date_to, page, per_page } =
-      parsed.data;
+    const {
+      search,
+      status,
+      manufacturer_id,
+      date_from,
+      date_to,
+      page,
+      per_page,
+    } = parsed.data;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};

@@ -8,6 +8,11 @@ import {
 } from "@upds/ui";
 import { createRecipient, updateRecipient } from "@/actions/recipients";
 import { enumToOptions, RecipientType, RECIPIENT_TYPE_LABELS } from "@upds/validators";
+import type {
+  CreateRecipientInput,
+  UpdateRecipientInput,
+  RecipientType as RecipientTypeValue,
+} from "@upds/validators";
 
 const typeOptions = enumToOptions(RecipientType, RECIPIENT_TYPE_LABELS);
 
@@ -27,7 +32,9 @@ export function RecipientForm({ recipient }: RecipientFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState(recipient?.type ?? "STUDENT");
+  const [type, setType] = useState<RecipientTypeValue>(
+    (recipient?.type as RecipientTypeValue | undefined) ?? "STUDENT",
+  );
   const isEdit = !!recipient;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -35,8 +42,7 @@ export function RecipientForm({ recipient }: RecipientFormProps) {
     setError(null);
     const fd = new FormData(e.currentTarget);
 
-    const data: any = {
-      ...(isEdit ? { id: recipient.id } : { document_number: fd.get("document_number") as string }),
+    const baseData = {
       full_name: fd.get("full_name") as string,
       type,
       phone: (fd.get("phone") as string) || undefined,
@@ -45,7 +51,9 @@ export function RecipientForm({ recipient }: RecipientFormProps) {
     };
 
     startTransition(async () => {
-      const result = isEdit ? await updateRecipient(data) : await createRecipient(data);
+      const result = isEdit
+        ? await updateRecipient({ id: recipient.id, ...baseData } satisfies UpdateRecipientInput)
+        : await createRecipient({ document_number: fd.get("document_number") as string, ...baseData } satisfies CreateRecipientInput);
       if (result.success) {
         router.push(isEdit ? `/recipients/${recipient.id}` : "/recipients");
       } else {
@@ -83,7 +91,7 @@ export function RecipientForm({ recipient }: RecipientFormProps) {
 
           <div className="space-y-2">
             <Label>Tipo *</Label>
-            <Select value={type} onValueChange={setType}>
+            <Select value={type} onValueChange={(value) => setType(value as RecipientTypeValue)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {typeOptions.map((o) => (

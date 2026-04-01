@@ -9,6 +9,13 @@ import {
 import { MOVEMENT_TYPE_LABELS, MOVEMENT_STATUS_LABELS } from "@upds/validators";
 import { MovementActions, RemoveItemButton } from "../_components/movement-actions";
 
+function asNumber(value: number | string | { toNumber(): number } | null | undefined): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return value.toNumber();
+}
+
 const statusColors: Record<string, string> = {
   DRAFT: "bg-yellow-100 text-yellow-800",
   CONFIRMED: "bg-green-100 text-green-800",
@@ -122,8 +129,10 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
                   </TableCell>
                 </TableRow>
               ) : (
-                (m.items ?? []).map((item: any) => {
+                (m.items ?? []).map((item) => {
                   const v = item.product_variant;
+                  const unitPrice = asNumber(item.unit_price);
+                  const subtotal = asNumber(item.subtotal);
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
@@ -135,12 +144,12 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
                       <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
                       {isSale && (
                         <TableCell className="text-right tabular-nums">
-                          Bs {(item.unit_price ?? 0).toFixed(2)}
+                           Bs {unitPrice.toFixed(2)}
                         </TableCell>
                       )}
                       {isSale && (
                         <TableCell className="text-right tabular-nums">
-                          Bs {(item.subtotal ?? 0).toFixed(2)}
+                           Bs {subtotal.toFixed(2)}
                         </TableCell>
                       )}
                       {isDraft && (
@@ -154,10 +163,10 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
               )}
             </TableBody>
           </Table>
-          {m.total_amount > 0 && (
+          {asNumber(m.total_amount) > 0 && (
             <div className="p-4 border-t flex justify-end">
               <span className="text-muted-foreground">Total:</span>{" "}
-              <span className="font-bold tabular-nums ml-2">Bs {m.total_amount.toFixed(2)}</span>
+              <span className="font-bold tabular-nums ml-2">Bs {asNumber(m.total_amount).toFixed(2)}</span>
             </div>
           )}
         </CardContent>

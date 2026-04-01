@@ -1,8 +1,14 @@
 "use server";
 
 import { prisma } from "@upds/db";
-import { ProductService } from "@upds/services";
+import { InventoryMovementService, ProductService } from "@upds/services";
 import { requirePermission } from "@/lib/session";
+
+interface LoadInitialStockInput {
+  product_variant_id: string;
+  quantity: number;
+  notes: string;
+}
 
 const productService = new ProductService(prisma);
 
@@ -29,6 +35,79 @@ export async function reactivateProductAction(productId: string) {
 export async function addVariantAction(input: unknown) {
   const session = await requirePermission("product:create");
   return productService.addVariant(input, session.id);
+}
+
+export async function loadInitialStockAction(input: LoadInitialStockInput) {
+  const session = await requirePermission("movement:create");
+  await requirePermission("movement:confirm");
+
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: input.product_variant_id },
+    select: { id: true, product_id: true, is_active: true },
+  });
+
+  if (!variant) {
+    return { success: false as const, error: "Variante no encontrada" };
+  }
+
+  if (!variant.is_active) {
+    return { success: false as const, error: "La variante está desactivada" };
+  }
+
+  const movementService = new InventoryMovementService(prisma);
+
+  return prisma
+    .$transaction(async (tx) => {
+      const created = await movementService.createMovement(
+        {
+          movement_type: "ADJUSTMENT",
+          notes: input.notes,
+        },
+        session.id,
+        undefined,
+        tx,
+      );
+
+      if (!created.success) {
+        throw new Error(created.error);
+      }
+
+      const withItem = await movementService.addItem(
+        {
+          movement_id: created.data.id,
+          product_variant_id: input.product_variant_id,
+          quantity: input.quantity,
+          unit_price: 0,
+        },
+        session.id,
+        undefined,
+        tx,
+      );
+
+      if (!withItem.success) {
+        throw new Error(withItem.error);
+      }
+
+      const confirmed = await movementService.confirmMovement(
+        { movement_id: created.data.id },
+        session.id,
+        undefined,
+        tx,
+      );
+
+      if (!confirmed.success) {
+        throw new Error(confirmed.error);
+      }
+
+      return confirmed;
+    })
+    .catch((error: unknown) => ({
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar el stock inicial",
+    }));
 }
 
 export async function deactivateVariantAction(variantId: string) {

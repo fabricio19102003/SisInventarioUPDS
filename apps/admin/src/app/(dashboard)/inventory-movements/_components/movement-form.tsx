@@ -10,6 +10,10 @@ import { createMovement } from "@/actions/inventory-movements";
 import { getRecipients } from "@/actions/recipients";
 import { getDepartments } from "@/actions/departments";
 import { enumToOptions, MovementType, MOVEMENT_TYPE_LABELS } from "@upds/validators";
+import type { RecipientData, DepartmentData } from "@upds/services";
+import type { CreateMovementInput } from "@upds/validators";
+
+type MovementTypeValue = CreateMovementInput["movement_type"];
 
 // Exclude ENTRY since it's auto-created from manufacture orders
 const typeOptions = enumToOptions(MovementType, MOVEMENT_TYPE_LABELS).filter(
@@ -20,12 +24,12 @@ export function MovementForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [movementType, setMovementType] = useState("");
+  const [movementType, setMovementType] = useState<MovementTypeValue | "">("");
   const [recipientId, setRecipientId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [notes, setNotes] = useState("");
-  const [recipients, setRecipients] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [recipients, setRecipients] = useState<RecipientData[]>([]);
+  const [departments, setDepartments] = useState<DepartmentData[]>([]);
 
   const needsRecipient = movementType === "SALE" || movementType === "DONATION";
   const needsDepartment = movementType === "DEPARTMENT_DELIVERY";
@@ -36,8 +40,8 @@ export function MovementForm() {
       getRecipients({ is_active: true }).then((r) => {
         if (r.success) {
           let filtered = r.data.recipients;
-          if (movementType === "SALE") filtered = filtered.filter((rc: any) => rc.type !== "SCHOLAR");
-          if (movementType === "DONATION") filtered = filtered.filter((rc: any) => rc.type === "SCHOLAR");
+          if (movementType === "SALE") filtered = filtered.filter((rc) => rc.type !== "SCHOLAR");
+          if (movementType === "DONATION") filtered = filtered.filter((rc) => rc.type === "SCHOLAR");
           setRecipients(filtered);
         }
       });
@@ -53,12 +57,40 @@ export function MovementForm() {
     e.preventDefault();
     setError(null);
 
-    const data: any = {
-      movement_type: movementType,
-      notes: notes || undefined,
-      recipient_id: needsRecipient ? recipientId : undefined,
-      department_id: needsDepartment ? departmentId : undefined,
-    };
+    if (!movementType) {
+      setError("Seleccioná un tipo de movimiento");
+      return;
+    }
+
+    let data: CreateMovementInput;
+
+    switch (movementType) {
+      case "SALE":
+      case "DONATION":
+        data = {
+          movement_type: movementType,
+          recipient_id: recipientId,
+          notes: notes || undefined,
+        };
+        break;
+      case "DEPARTMENT_DELIVERY":
+        data = {
+          movement_type: movementType,
+          department_id: departmentId,
+          notes: notes || undefined,
+        };
+        break;
+      case "WRITE_OFF":
+      case "ADJUSTMENT":
+        data = {
+          movement_type: movementType,
+          notes,
+        };
+        break;
+      default:
+        setError("Tipo de movimiento no soportado desde este formulario");
+        return;
+    }
 
     startTransition(async () => {
       const result = await createMovement(data);
@@ -86,7 +118,7 @@ export function MovementForm() {
           <div className="space-y-2">
             <Label>Tipo de Movimiento *</Label>
             <Select value={movementType} onValueChange={(v) => {
-              setMovementType(v);
+                setMovementType(v as MovementTypeValue);
               setRecipientId("");
               setDepartmentId("");
             }}>
@@ -103,7 +135,7 @@ export function MovementForm() {
               <Select value={recipientId} onValueChange={setRecipientId}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar destinatario..." /></SelectTrigger>
                 <SelectContent>
-                  {recipients.map((r: any) => (
+                  {recipients.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
                       {r.full_name} ({r.document_number})
                     </SelectItem>
@@ -119,7 +151,7 @@ export function MovementForm() {
               <Select value={departmentId} onValueChange={setDepartmentId}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar departamento..." /></SelectTrigger>
                 <SelectContent>
-                  {departments.map((d: any) => (
+                  {departments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.name} ({d.code})</SelectItem>
                   ))}
                 </SelectContent>

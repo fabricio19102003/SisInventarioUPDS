@@ -50,11 +50,6 @@ const variantSchema = z.object({
     required_error: "Género obligatorio",
   }),
   color: z.string().min(1, "Color obligatorio").max(100),
-  initial_stock: z.coerce
-    .number({ invalid_type_error: "Número" })
-    .int("Entero")
-    .min(0, "≥ 0")
-    .default(0),
 });
 
 const createSchema = z
@@ -76,12 +71,6 @@ const createSchema = z
       .int("Debe ser entero")
       .min(0, "No puede ser negativo")
       .default(5),
-    initial_stock: z.coerce
-      .number({ invalid_type_error: "Debe ser un número" })
-      .int("Debe ser entero")
-      .min(0, "No puede ser negativo")
-      .default(0)
-      .optional(),
     variants: z.array(variantSchema).optional(),
   })
   .superRefine((data, ctx) => {
@@ -146,7 +135,6 @@ export function ProductCreateForm({
       name: "",
       description: "",
       min_stock: 5,
-      initial_stock: 0,
       variants: [],
     },
   });
@@ -174,7 +162,7 @@ export function ProductCreateForm({
         warehouse_area: isMedical ? "MEDICAL" : "OFFICE",
         description: values.description || undefined,
         garment_type: isMedical ? values.garment_type : undefined,
-        initial_stock: isMedical ? undefined : (values.initial_stock ?? 0),
+        initial_stock: 0,
         variants: isMedical ? values.variants : undefined,
       };
 
@@ -329,17 +317,10 @@ export function ProductCreateForm({
             </div>
           )}
 
-          {/* OFFICE: Stock inicial */}
+          {/* OFFICE: stock por movimiento */}
           {categoryValue === "OFFICE_SUPPLY" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="initial_stock">Stock Inicial</Label>
-              <Input
-                id="initial_stock"
-                type="number"
-                min={0}
-                disabled={isPending}
-                {...register("initial_stock")}
-              />
+            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              El producto se crea con stock 0. Para cargar existencias iniciales usá un movimiento de ajuste o una entrada.
             </div>
           )}
 
@@ -362,7 +343,7 @@ export function ProductCreateForm({
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      append({ size: "M", gender: "UNISEX", color: "", initial_stock: 0 })
+                      append({ size: "M", gender: "UNISEX", color: "" })
                     }
                     disabled={isPending}
                   >
@@ -379,23 +360,22 @@ export function ProductCreateForm({
 
                 {fields.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    Sin variantes. Hacé clic en "Agregar fila" para empezar.
+                    Sin variantes. Hacé clic en &quot;Agregar fila&quot; para empezar.
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {/* Header */}
-                    <div className="grid grid-cols-[1fr_1fr_1fr_80px_40px] gap-2 px-1">
+                    <div className="grid grid-cols-[1fr_1fr_1fr_40px] gap-2 px-1">
                       <span className="text-xs font-medium text-muted-foreground">Talla</span>
                       <span className="text-xs font-medium text-muted-foreground">Género</span>
                       <span className="text-xs font-medium text-muted-foreground">Color</span>
-                      <span className="text-xs font-medium text-muted-foreground">Stock ini.</span>
                       <span />
                     </div>
 
                     {fields.map((field, index) => (
                       <div
                         key={field.id}
-                        className="grid grid-cols-[1fr_1fr_1fr_80px_40px] gap-2 items-start"
+                        className="grid grid-cols-[1fr_1fr_1fr_40px] gap-2 items-start"
                       >
                         {/* Talla */}
                         <Select
@@ -449,15 +429,6 @@ export function ProductCreateForm({
                           placeholder="Azul"
                           disabled={isPending}
                           {...register(`variants.${index}.color`)}
-                        />
-
-                        {/* Stock inicial */}
-                        <Input
-                          className="h-9"
-                          type="number"
-                          min={0}
-                          disabled={isPending}
-                          {...register(`variants.${index}.initial_stock`)}
                         />
 
                         {/* Eliminar fila */}

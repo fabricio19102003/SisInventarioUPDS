@@ -42,11 +42,6 @@ const schema = z.object({
     required_error: "El género es obligatorio",
   }),
   color: z.string().min(1, "El color es obligatorio").max(100),
-  initial_stock: z.coerce
-    .number({ invalid_type_error: "Debe ser un número" })
-    .int("Debe ser entero")
-    .min(0, "No puede ser negativo")
-    .default(0),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -88,7 +83,7 @@ export function AddVariantForm({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { color: "", initial_stock: 0 },
+    defaultValues: { color: "" },
   });
 
   const sizeValue = watch("size");
@@ -96,7 +91,7 @@ export function AddVariantForm({
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
-      const result = await addVariantAction({ ...values, product_id: productId });
+      const result = await addVariantAction({ ...values, product_id: productId, initial_stock: 0 });
 
       if (!result.success) {
         toast({ title: "Error", description: result.error, variant: "destructive" });
@@ -187,21 +182,8 @@ export function AddVariantForm({
             )}
           </div>
 
-          {/* Stock inicial */}
-          <div className="space-y-1.5">
-            <Label htmlFor="initial_stock">Stock Inicial</Label>
-            <Input
-              id="initial_stock"
-              type="number"
-              min={0}
-              disabled={isPending}
-              {...register("initial_stock")}
-            />
-            {errors.initial_stock && (
-              <p className="text-xs text-destructive">
-                {errors.initial_stock.message}
-              </p>
-            )}
+          <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+            La variante se crea con stock 0. La carga inicial se hace mediante un movimiento.
           </div>
 
           <DialogFooter>

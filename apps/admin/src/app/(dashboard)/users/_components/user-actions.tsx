@@ -56,7 +56,6 @@ export function UserActions({ userId, isActive }: UserActionsProps) {
 }
 
 function ResetPasswordDialog({ userId }: { userId: string }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

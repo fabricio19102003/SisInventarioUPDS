@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import type { ProductData, ProductVariantData } from "@upds/services"
 import {
   DataTable,
   DataTableColumnHeader,
@@ -20,19 +21,17 @@ import {
   WAREHOUSE_AREA_LABELS,
 } from "@upds/validators"
 import { Eye, Search } from "lucide-react"
+import { InitialStockButton } from "./initial-stock-button"
 
-interface Product {
-  id: string
-  sku: string
-  name: string
-  category: string
-  garment_type: string | null
-  warehouse_area: string
-  min_stock: number
-  is_active: boolean
+function getSingleActiveVariant(product: ProductData): ProductVariantData | null {
+  const activeVariants = product.variants.filter((variant) => variant.is_active)
+  if (activeVariants.length !== 1) return null
+
+  const [variant] = activeVariants
+  return variant ?? null
 }
 
-const columns: ColumnDef<Product>[] = [
+const columns: ColumnDef<ProductData>[] = [
   {
     accessorKey: "sku",
     header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
@@ -110,27 +109,45 @@ const columns: ColumnDef<Product>[] = [
   },
   {
     id: "actions",
-    size: 80,
+    size: 240,
     enableSorting: false,
-    cell: ({ row }) => (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link href={`/products/${row.original.id}`}>
-              <Button variant="ghost" size="sm">
-                <Eye className="h-4 w-4" />
-              </Button>
+    cell: ({ row }) => {
+      const product = row.original
+      const singleVariant = getSingleActiveVariant(product)
+
+      return (
+        <div className="flex items-center justify-end gap-2">
+          {product.is_active && singleVariant ? (
+            <InitialStockButton
+              productVariantId={singleVariant.id}
+              productLabel={`${product.sku}-${singleVariant.sku_suffix}`}
+            />
+          ) : product.is_active ? (
+            <Link href={`/products/${product.id}`}>
+              <Button variant="outline" size="sm">Elegir variante</Button>
             </Link>
-          </TooltipTrigger>
-          <TooltipContent>Ver detalles</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ),
+          ) : null}
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href={`/products/${product.id}`}>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Ver detalles</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )
+    },
   },
 ]
 
 interface ProductsTableProps {
-  products: Product[]
+  products: ProductData[]
 }
 
 export function ProductsTable({ products }: ProductsTableProps) {

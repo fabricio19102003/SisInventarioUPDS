@@ -4,6 +4,7 @@ import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from "@upds/ui";
 import { createDepartment, updateDepartment } from "@/actions/departments";
+import type { CreateDepartmentInput, UpdateDepartmentInput } from "@upds/validators";
 
 interface DepartmentFormProps {
   department?: { id: string; name: string; code: string };
@@ -20,14 +21,15 @@ export function DepartmentForm({ department }: DepartmentFormProps) {
     setError(null);
     const fd = new FormData(e.currentTarget);
 
-    const data: any = {
-      ...(isEdit ? { id: department.id } : {}),
+    const baseData = {
       name: fd.get("name") as string,
       code: fd.get("code") as string,
     };
 
     startTransition(async () => {
-      const result = isEdit ? await updateDepartment(data) : await createDepartment(data);
+      const result = isEdit
+        ? await updateDepartment({ id: department.id, ...baseData } satisfies UpdateDepartmentInput)
+        : await createDepartment(baseData satisfies CreateDepartmentInput);
       if (result.success) {
         router.push(isEdit ? `/departments/${department.id}` : "/departments");
       } else {

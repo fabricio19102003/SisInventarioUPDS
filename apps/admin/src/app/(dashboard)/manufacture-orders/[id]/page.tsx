@@ -2,12 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getManufactureOrder } from "@/actions/manufacture-orders";
 import {
-  Card, CardContent, CardHeader, CardTitle, Button, Badge,
+  Card, CardContent, CardHeader, CardTitle, Button,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   PageTransition,
 } from "@upds/ui";
 import { MANUFACTURE_ORDER_STATUS_LABELS } from "@upds/validators";
 import { OrderActions } from "../_components/order-actions";
+import type { ManufactureOrderItemData } from "@upds/services";
+
+function asNumber(value: number | string | { toNumber(): number } | null | undefined): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return value.toNumber();
+}
 
 const statusColors: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
@@ -22,8 +30,16 @@ export default async function ManufactureOrderDetailPage({ params }: { params: P
   if (!result.success) return notFound();
   const o = result.data;
 
-  const totalOrdered = (o.items ?? []).reduce((s: number, i: any) => s + (i.quantity_ordered * (i.unit_cost ?? 0)), 0);
-  const totalReceived = (o.items ?? []).reduce((s: number, i: any) => s + (i.quantity_received * (i.unit_cost ?? 0)), 0);
+  const totalOrdered = (o.items ?? []).reduce(
+    (sum: number, item: ManufactureOrderItemData) =>
+      sum + item.quantity_ordered * asNumber(item.unit_cost),
+    0,
+  );
+  const totalReceived = (o.items ?? []).reduce(
+    (sum: number, item: ManufactureOrderItemData) =>
+      sum + item.quantity_received * asNumber(item.unit_cost),
+    0,
+  );
 
   return (
     <PageTransition>
@@ -98,9 +114,10 @@ export default async function ManufactureOrderDetailPage({ params }: { params: P
                   </TableCell>
                 </TableRow>
               ) : (
-                (o.items ?? []).map((item: any) => {
+                (o.items ?? []).map((item: ManufactureOrderItemData) => {
                   const variant = item.product_variant;
                   const pct = item.quantity_ordered > 0 ? Math.round((item.quantity_received / item.quantity_ordered) * 100) : 0;
+                  const unitCost = asNumber(item.unit_cost);
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
@@ -111,9 +128,9 @@ export default async function ManufactureOrderDetailPage({ params }: { params: P
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{item.quantity_ordered}</TableCell>
                       <TableCell className="text-right tabular-nums">{item.quantity_received}</TableCell>
-                      <TableCell className="text-right tabular-nums">Bs {(item.unit_cost ?? 0).toFixed(2)}</TableCell>
+                      <TableCell className="text-right tabular-nums">Bs {unitCost.toFixed(2)}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        Bs {(item.quantity_ordered * (item.unit_cost ?? 0)).toFixed(2)}
+                        Bs {(item.quantity_ordered * unitCost).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

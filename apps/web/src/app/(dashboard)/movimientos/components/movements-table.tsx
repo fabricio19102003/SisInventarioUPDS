@@ -100,7 +100,7 @@ export function MovementsTable({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
+  useToast();
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<MovementData | null>(null);

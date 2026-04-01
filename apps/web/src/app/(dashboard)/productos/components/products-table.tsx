@@ -49,6 +49,7 @@ import {
 import { ProductCreateForm } from "./product-create-form";
 import { ProductEditForm } from "./product-edit-form";
 import { ProductVariantsSheet } from "./product-variants-sheet";
+import { InitialStockButton } from "./initial-stock-button";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -77,6 +78,11 @@ function hasLowStock(product: ProductData): boolean {
   return product.variants.some(
     (v) => v.is_active && v.current_stock < product.min_stock,
   );
+}
+
+function getSingleActiveVariant(product: ProductData) {
+  const activeVariants = product.variants.filter((variant) => variant.is_active);
+  return activeVariants.length === 1 ? activeVariants[0] : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -273,12 +279,24 @@ export function ProductsTable({
     },
     {
       id: "actions",
-      size: 120,
+      size: 220,
       enableSorting: false,
       cell: ({ row }) => {
         const p = row.original;
+        const singleVariant = getSingleActiveVariant(p);
         return (
           <div className="flex items-center gap-1">
+            {p.is_active && singleVariant ? (
+              <InitialStockButton
+                productVariantId={singleVariant.id}
+                productLabel={`${p.sku}-${singleVariant.sku_suffix}`}
+              />
+            ) : p.is_active ? (
+              <Button variant="outline" size="sm" onClick={() => setSheetProduct(p)}>
+                Stock
+              </Button>
+            ) : null}
+
             {/* Ver variantes */}
             <Button
               variant="ghost"

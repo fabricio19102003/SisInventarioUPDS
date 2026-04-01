@@ -5,7 +5,7 @@
 // El stock solo se modifica al confirmar, dentro de una transaccion atomica.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { type PrismaClient, type TransactionClient, type Prisma } from "@upds/db";
+import { type PrismaClient, type TransactionClient, Prisma } from "@upds/db";
 import {
   createMovementSchema,
   addMovementItemSchema,
@@ -15,6 +15,55 @@ import {
 } from "@upds/validators";
 import { createAuditLog } from "./audit";
 import type { ServiceResult, AuditContext } from "./auth";
+
+const SERIALIZABLE_RETRY_LIMIT = 3;
+
+function isSerializableConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
+}
+
+async function runSerializable<T>(
+  db: PrismaClient,
+  execute: (tx: TransactionClient) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < SERIALIZABLE_RETRY_LIMIT; attempt += 1) {
+    try {
+      return await db.$transaction(execute, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      lastError = error;
+      if (
+        !isSerializableConflict(error) ||
+        attempt === SERIALIZABLE_RETRY_LIMIT - 1
+      ) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+function groupMovementQuantitiesByVariant(
+  items: Array<{ product_variant_id: string; quantity: number }>,
+): Map<string, number> {
+  const grouped = new Map<string, number>();
+
+  for (const item of items) {
+    grouped.set(
+      item.product_variant_id,
+      (grouped.get(item.product_variant_id) ?? 0) + item.quantity,
+    );
+  }
+
+  return grouped;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Selects reutilizables
@@ -253,10 +302,7 @@ export class InventoryMovementService {
         return { success: false, error: "El destinatario esta desactivado" };
       }
 
-      if (
-        data.movement_type === "DONATION" &&
-        recipient.type !== "SCHOLAR"
-      ) {
+      if (data.movement_type === "DONATION" && recipient.type !== "SCHOLAR") {
         return {
           success: false,
           error:
@@ -466,10 +512,20 @@ export class InventoryMovementService {
     }
 
     // Para ENTRY, validar contra orden de fabricacion
-    if (
-      movement.movement_type === "ENTRY" &&
-      movement.manufacture_order_id
-    ) {
+    if (movement.movement_type === "ENTRY" && movement.manufacture_order_id) {
+      const existingDraftItems = await db.movementItem.findMany({
+        where: {
+          inventory_movement_id: data.movement_id,
+          product_variant_id: data.product_variant_id,
+        },
+        select: { quantity: true },
+      });
+
+      const alreadyDrafted = existingDraftItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+
       const orderItem = await db.manufactureOrderItem.findUnique({
         where: {
           manufacture_order_id_product_variant_id: {
@@ -493,10 +549,10 @@ export class InventoryMovementService {
 
       const remaining =
         orderItem.quantity_ordered - orderItem.quantity_received;
-      if (data.quantity > remaining) {
+      if (alreadyDrafted + data.quantity > remaining) {
         return {
           success: false,
-          error: `La cantidad excede lo pendiente de recibir. Pendiente: ${remaining}`,
+          error: `La cantidad acumulada excede lo pendiente de recibir. Pendiente: ${remaining}, ya cargado en borrador: ${alreadyDrafted}`,
         };
       }
     }
@@ -691,16 +747,52 @@ export class InventoryMovementService {
     if (movement.items.length === 0) {
       return {
         success: false,
-        error:
-          "No se puede confirmar un movimiento sin items",
+        error: "No se puede confirmar un movimiento sin items",
       };
     }
 
     const execute = async (tx: TransactionClient) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Audit log stock tracking
-      const stockChanges: Record<string, any> = {};
+      const stockChanges: Record<string, unknown> = {};
 
-      for (const item of movement.items) {
+      if (movement.movement_type === "ENTRY" && movement.manufacture_order_id) {
+        const groupedItems = groupMovementQuantitiesByVariant(movement.items);
+
+        for (const [productVariantId, totalQuantity] of groupedItems) {
+          const orderItem = await tx.manufactureOrderItem.findUnique({
+            where: {
+              manufacture_order_id_product_variant_id: {
+                manufacture_order_id: movement.manufacture_order_id,
+                product_variant_id: productVariantId,
+              },
+            },
+            select: {
+              quantity_ordered: true,
+              quantity_received: true,
+            },
+          });
+
+          if (!orderItem) {
+            throw new Error(
+              "La variante no esta incluida en la orden de fabricacion vinculada",
+            );
+          }
+
+          const remaining =
+            orderItem.quantity_ordered - orderItem.quantity_received;
+
+          if (totalQuantity > remaining) {
+            throw new Error(
+              `La recepcion excede lo pendiente para la variante ${productVariantId}. Pendiente: ${remaining}, acumulado en movimiento: ${totalQuantity}`,
+            );
+          }
+        }
+      }
+
+      const orderedItems = [...movement.items].sort((left, right) =>
+        left.product_variant_id.localeCompare(right.product_variant_id),
+      );
+
+      for (const item of orderedItems) {
         const variant = await tx.productVariant.findUniqueOrThrow({
           where: { id: item.product_variant_id },
           select: {
@@ -760,20 +852,19 @@ export class InventoryMovementService {
       }
 
       // Para ENTRY, actualizar quantity_received en ManufactureOrderItem
-      if (
-        movement.movement_type === "ENTRY" &&
-        movement.manufacture_order_id
-      ) {
-        for (const item of movement.items) {
+      if (movement.movement_type === "ENTRY" && movement.manufacture_order_id) {
+        const groupedItems = groupMovementQuantitiesByVariant(movement.items);
+
+        for (const [productVariantId, totalQuantity] of groupedItems) {
           await tx.manufactureOrderItem.update({
             where: {
               manufacture_order_id_product_variant_id: {
                 manufacture_order_id: movement.manufacture_order_id,
-                product_variant_id: item.product_variant_id,
+                product_variant_id: productVariantId,
               },
             },
             data: {
-              quantity_received: { increment: item.quantity },
+              quantity_received: { increment: totalQuantity },
             },
           });
         }
@@ -842,7 +933,7 @@ export class InventoryMovementService {
 
     const confirmedMovement = externalTx
       ? await execute(externalTx)
-      : await this.db.$transaction(execute);
+      : await runSerializable(this.db, execute);
 
     return { success: true, data: confirmedMovement as MovementData };
   }
@@ -954,8 +1045,15 @@ export class InventoryMovementService {
       };
     }
 
-    const { search, movement_type, status, date_from, date_to, page, per_page } =
-      parsed.data;
+    const {
+      search,
+      movement_type,
+      status,
+      date_from,
+      date_to,
+      page,
+      per_page,
+    } = parsed.data;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma where types; values validated by Zod
     const where: Record<string, any> = {};

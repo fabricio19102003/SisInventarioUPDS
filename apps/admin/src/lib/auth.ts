@@ -1,12 +1,15 @@
 import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@upds/db";
 import { AuthService } from "@upds/services";
 import { loginSchema } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
+import "./auth.types";
 
 const authService = new AuthService(prisma);
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const authConfig: NextAuthConfig = {
   providers: [
     Credentials({
       name: "credentials",
@@ -36,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           email: user.email,
           full_name: user.full_name,
-          role: user.role,
+          role: user.role as UserRole,
         };
       },
     }),
@@ -53,8 +56,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id as string;
-        token.email = user.email as string;
+        token.id = user.id!;
+        token.email = user.email!;
         token.full_name = user.full_name;
         token.role = user.role;
       }
@@ -63,12 +66,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
 
     async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.email = token.email;
-      session.user.full_name = token.full_name;
-      session.user.role = token.role;
+      session.user.id = token.id as string;
+      session.user.email = token.email as string;
+      session.user.full_name = token.full_name as string;
+      session.user.role = token.role as UserRole;
 
       return session;
     },
   },
-});
+};
+
+const nextAuthResult = NextAuth(authConfig);
+
+export const handlers: typeof nextAuthResult.handlers = nextAuthResult.handlers;
+export const auth: typeof nextAuthResult.auth = nextAuthResult.auth;
+export const signIn: typeof nextAuthResult.signIn = nextAuthResult.signIn;
+export const signOut: typeof nextAuthResult.signOut = nextAuthResult.signOut;

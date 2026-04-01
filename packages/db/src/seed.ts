@@ -13,6 +13,139 @@ const prisma = new PrismaClient();
 
 const SALT_ROUNDS = 12;
 
+interface SeedMovementItem {
+  product_variant_id: string;
+  quantity: number;
+  unit_price?: number;
+}
+
+interface SeedMovementInput {
+  movement_number: string;
+  movement_type:
+    | "ENTRY"
+    | "SALE"
+    | "DONATION"
+    | "WRITE_OFF"
+    | "ADJUSTMENT"
+    | "DEPARTMENT_DELIVERY";
+  processed_by: string;
+  created_at: Date;
+  processed_at?: Date;
+  cancelled_at?: Date;
+  cancel_reason?: string;
+  recipient_id?: string;
+  department_id?: string;
+  manufacture_order_id?: string;
+  notes?: string;
+  items?: SeedMovementItem[];
+  status: "DRAFT" | "CONFIRMED" | "CANCELLED";
+}
+
+async function createSeedMovement(input: SeedMovementInput) {
+  await prisma.$transaction(async (tx) => {
+    const items = input.items ?? [];
+    const totalAmount = items.reduce(
+      (sum, item) => sum + item.quantity * (item.unit_price ?? 0),
+      0,
+    );
+
+    const movement = await tx.inventoryMovement.create({
+      data: {
+        movement_number: input.movement_number,
+        movement_type: input.movement_type,
+        status: input.status,
+        is_donated: input.movement_type === "DONATION",
+        total_amount:
+          input.status === "CONFIRMED" || items.length > 0 ? totalAmount : 0,
+        notes: input.notes ?? null,
+        cancel_reason:
+          input.status === "CANCELLED"
+            ? (input.cancel_reason ??
+              "Cancelado durante la carga de datos inicial.")
+            : null,
+        recipient_id: input.recipient_id ?? null,
+        department_id: input.department_id ?? null,
+        manufacture_order_id: input.manufacture_order_id ?? null,
+        processed_by: input.processed_by,
+        processed_at: input.processed_at ?? null,
+        cancelled_at:
+          input.status === "CANCELLED" ? (input.cancelled_at ?? null) : null,
+        created_at: input.created_at,
+      },
+    });
+
+    for (const item of items) {
+      await tx.movementItem.create({
+        data: {
+          inventory_movement_id: movement.id,
+          product_variant_id: item.product_variant_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price ?? 0,
+          subtotal: item.quantity * (item.unit_price ?? 0),
+        },
+      });
+    }
+
+    if (input.status !== "CONFIRMED") {
+      return;
+    }
+
+    for (const item of items) {
+      const variant = await tx.productVariant.findUniqueOrThrow({
+        where: { id: item.product_variant_id },
+        select: { id: true, current_stock: true },
+      });
+
+      const nextStock =
+        input.movement_type === "ENTRY" || input.movement_type === "ADJUSTMENT"
+          ? variant.current_stock + item.quantity
+          : variant.current_stock - item.quantity;
+
+      await tx.productVariant.update({
+        where: { id: item.product_variant_id },
+        data: { current_stock: nextStock },
+      });
+    }
+
+    if (input.movement_type === "ENTRY" && input.manufacture_order_id) {
+      for (const item of items) {
+        await tx.manufactureOrderItem.update({
+          where: {
+            manufacture_order_id_product_variant_id: {
+              manufacture_order_id: input.manufacture_order_id,
+              product_variant_id: item.product_variant_id,
+            },
+          },
+          data: {
+            quantity_received: {
+              increment: item.quantity,
+            },
+          },
+        });
+      }
+
+      const orderItems = await tx.manufactureOrderItem.findMany({
+        where: { manufacture_order_id: input.manufacture_order_id },
+        select: { quantity_ordered: true, quantity_received: true },
+      });
+
+      const allComplete = orderItems.every(
+        (item) => item.quantity_received >= item.quantity_ordered,
+      );
+
+      await tx.manufactureOrder.update({
+        where: { id: input.manufacture_order_id },
+        data: {
+          status: allComplete ? "COMPLETED" : "IN_PROGRESS",
+          completed_at: allComplete
+            ? (input.processed_at ?? input.created_at)
+            : null,
+        },
+      });
+    }
+  });
+}
+
 async function main() {
   console.log("Limpiando base de datos...");
   await prisma.movementItem.deleteMany();
@@ -197,7 +330,7 @@ async function main() {
         size: "M",
         gender: "UNISEX",
         color: "Azul",
-        current_stock: 16,
+        current_stock: 0,
       },
     }),
     prisma.productVariant.create({
@@ -207,7 +340,7 @@ async function main() {
         size: "L",
         gender: "UNISEX",
         color: "Azul",
-        current_stock: 15,
+        current_stock: 0,
       },
     }),
     prisma.productVariant.create({
@@ -217,7 +350,7 @@ async function main() {
         size: "M",
         gender: "UNISEX",
         color: "Verde",
-        current_stock: 11,
+        current_stock: 0,
       },
     }),
     prisma.productVariant.create({
@@ -227,7 +360,7 @@ async function main() {
         size: "L",
         gender: "UNISEX",
         color: "Verde",
-        current_stock: 2, // STOCK BAJO
+        current_stock: 0,
       },
     }),
   ]);
@@ -253,7 +386,7 @@ async function main() {
         size: "M",
         gender: "FEMENINO",
         color: "Blanco",
-        current_stock: 8,
+        current_stock: 0,
       },
     }),
     prisma.productVariant.create({
@@ -263,7 +396,7 @@ async function main() {
         size: "L",
         gender: "MASCULINO",
         color: "Blanco",
-        current_stock: 6,
+        current_stock: 0,
       },
     }),
     prisma.productVariant.create({
@@ -273,7 +406,7 @@ async function main() {
         size: "XL",
         gender: "MASCULINO",
         color: "Blanco",
-        current_stock: 2, // STOCK BAJO
+        current_stock: 0,
       },
     }),
   ]);
@@ -359,7 +492,7 @@ async function main() {
     data: {
       product_id: prodResma.id,
       sku_suffix: "DEFAULT",
-      current_stock: 50,
+      current_stock: 0,
     },
   });
 
@@ -377,7 +510,7 @@ async function main() {
     data: {
       product_id: prodToner.id,
       sku_suffix: "DEFAULT",
-      current_stock: 2, // STOCK BAJO
+      current_stock: 0,
     },
   });
 
@@ -394,7 +527,7 @@ async function main() {
     data: {
       product_id: prodCuaderno.id,
       sku_suffix: "DEFAULT",
-      current_stock: 30,
+      current_stock: 0,
     },
   });
 
@@ -408,7 +541,7 @@ async function main() {
     data: {
       order_number: "ORD-20260101-0001",
       manufacturer_id: mfgBoliviana.id,
-      status: "COMPLETED",
+      status: "PENDING",
       notes: "Pedido inicial de pijamas quirúrgicos para el semestre.",
       ordered_at: new Date("2026-01-10"),
       expected_at: new Date("2026-02-10"),
@@ -422,7 +555,7 @@ async function main() {
         manufacture_order_id: ord001.id,
         product_variant_id: pijMA.id,
         quantity_ordered: 20,
-        quantity_received: 20,
+        quantity_received: 0,
         unit_cost: 85.0,
       },
     }),
@@ -431,7 +564,7 @@ async function main() {
         manufacture_order_id: ord001.id,
         product_variant_id: pijLA.id,
         quantity_ordered: 15,
-        quantity_received: 15,
+        quantity_received: 0,
         unit_cost: 90.0,
       },
     }),
@@ -440,7 +573,7 @@ async function main() {
         manufacture_order_id: ord001.id,
         product_variant_id: pijMV.id,
         quantity_ordered: 12,
-        quantity_received: 12,
+        quantity_received: 0,
         unit_cost: 85.0,
       },
     }),
@@ -449,7 +582,7 @@ async function main() {
         manufacture_order_id: ord001.id,
         product_variant_id: pijLV.id,
         quantity_ordered: 8,
-        quantity_received: 8,
+        quantity_received: 0,
         unit_cost: 90.0,
       },
     }),
@@ -460,7 +593,7 @@ async function main() {
     data: {
       order_number: "ORD-20260215-0001",
       manufacturer_id: mfgMediWear.id,
-      status: "IN_PROGRESS",
+      status: "PENDING",
       notes: "Batas para el Hospital Universitario. Entrega parcial aceptada.",
       ordered_at: new Date("2026-02-15"),
       expected_at: new Date("2026-03-30"),
@@ -473,7 +606,7 @@ async function main() {
         manufacture_order_id: ord002.id,
         product_variant_id: batMF.id,
         quantity_ordered: 15,
-        quantity_received: 8,
+        quantity_received: 0,
         unit_cost: 120.0,
       },
     }),
@@ -482,7 +615,7 @@ async function main() {
         manufacture_order_id: ord002.id,
         product_variant_id: batLM.id,
         quantity_ordered: 10,
-        quantity_received: 6,
+        quantity_received: 0,
         unit_cost: 130.0,
       },
     }),
@@ -491,7 +624,7 @@ async function main() {
         manufacture_order_id: ord002.id,
         product_variant_id: batXLM.id,
         quantity_ordered: 8,
-        quantity_received: 3,
+        quantity_received: 0,
         unit_cost: 135.0,
       },
     }),
@@ -549,355 +682,152 @@ async function main() {
   // ===========================================================================
   console.log("Creando movimientos de inventario...");
 
-  // --- MOV-001: ENTRY CONFIRMED — Recepción de pijamas (ORD-001) ---
-  const mov001 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260208-0001",
-      movement_type: "ENTRY",
-      status: "CONFIRMED",
-      notes: "Recepción completa de pijamas quirúrgicos.",
-      manufacture_order_id: ord001.id,
-      processed_by: manager.id,
-      total_amount: 5495.0, // 20*85 + 15*90 + 12*85 + 8*90
-      processed_at: new Date("2026-02-08"),
-      created_at: new Date("2026-02-08"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260208-0001",
+    movement_type: "ENTRY",
+    status: "CONFIRMED",
+    notes: "Recepción completa de pijamas quirúrgicos.",
+    manufacture_order_id: ord001.id,
+    processed_by: manager.id,
+    processed_at: new Date("2026-02-08"),
+    created_at: new Date("2026-02-08"),
+    items: [
+      { product_variant_id: pijMA.id, quantity: 20, unit_price: 85 },
+      { product_variant_id: pijLA.id, quantity: 15, unit_price: 90 },
+      { product_variant_id: pijMV.id, quantity: 12, unit_price: 85 },
+      { product_variant_id: pijLV.id, quantity: 8, unit_price: 90 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov001.id,
-        product_variant_id: pijMA.id,
-        quantity: 20,
-        unit_price: 85.0,
-        subtotal: 1700.0,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov001.id,
-        product_variant_id: pijLA.id,
-        quantity: 15,
-        unit_price: 90.0,
-        subtotal: 1350.0,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov001.id,
-        product_variant_id: pijMV.id,
-        quantity: 12,
-        unit_price: 85.0,
-        subtotal: 1020.0,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov001.id,
-        product_variant_id: pijLV.id,
-        quantity: 8,
-        unit_price: 90.0,
-        subtotal: 720.0,
-      },
-    }),
-  ]);
-
-  // --- MOV-002: ENTRY CONFIRMED — Recepción parcial batas (ORD-002) ---
-  const mov002 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260305-0001",
-      movement_type: "ENTRY",
-      status: "CONFIRMED",
-      notes: "Primera entrega parcial de batas médicas.",
-      manufacture_order_id: ord002.id,
-      processed_by: manager.id,
-      total_amount: 2145.0, // 8*120 + 6*130 + 3*135
-      processed_at: new Date("2026-03-05"),
-      created_at: new Date("2026-03-05"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260305-0001",
+    movement_type: "ENTRY",
+    status: "CONFIRMED",
+    notes: "Primera entrega parcial de batas médicas.",
+    manufacture_order_id: ord002.id,
+    processed_by: manager.id,
+    processed_at: new Date("2026-03-05"),
+    created_at: new Date("2026-03-05"),
+    items: [
+      { product_variant_id: batMF.id, quantity: 8, unit_price: 120 },
+      { product_variant_id: batLM.id, quantity: 6, unit_price: 130 },
+      { product_variant_id: batXLM.id, quantity: 3, unit_price: 135 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov002.id,
-        product_variant_id: batMF.id,
-        quantity: 8,
-        unit_price: 120.0,
-        subtotal: 960.0,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov002.id,
-        product_variant_id: batLM.id,
-        quantity: 6,
-        unit_price: 130.0,
-        subtotal: 780.0,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov002.id,
-        product_variant_id: batXLM.id,
-        quantity: 3,
-        unit_price: 135.0,
-        subtotal: 405.0,
-      },
-    }),
-  ]);
-
-  // --- MOV-003: ADJUSTMENT CONFIRMED — Ingreso material de oficina ---
-  const mov003 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260115-0001",
-      movement_type: "ADJUSTMENT",
-      status: "CONFIRMED",
-      notes: "Carga inicial de stock de material de oficina.",
-      processed_by: manager.id,
-      total_amount: 0,
-      processed_at: new Date("2026-01-15"),
-      created_at: new Date("2026-01-15"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260115-0001",
+    movement_type: "ADJUSTMENT",
+    status: "CONFIRMED",
+    notes: "Carga inicial de stock de material de oficina.",
+    processed_by: manager.id,
+    processed_at: new Date("2026-01-15"),
+    created_at: new Date("2026-01-15"),
+    items: [
+      { product_variant_id: varResma.id, quantity: 60 },
+      { product_variant_id: varToner.id, quantity: 5 },
+      { product_variant_id: varCuaderno.id, quantity: 30 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov003.id,
-        product_variant_id: varResma.id,
-        quantity: 60,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov003.id,
-        product_variant_id: varToner.id,
-        quantity: 5,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov003.id,
-        product_variant_id: varCuaderno.id,
-        quantity: 30,
-      },
-    }),
-  ]);
-
-  // --- MOV-004: SALE CONFIRMED — Venta a estudiante ---
-  const mov004 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260220-0001",
-      movement_type: "SALE",
-      status: "CONFIRMED",
-      recipient_id: recMaria.id,
-      processed_by: manager.id,
-      total_amount: 900.0, // 2*150 + 4*150
-      processed_at: new Date("2026-02-20"),
-      created_at: new Date("2026-02-20"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260220-0001",
+    movement_type: "SALE",
+    status: "CONFIRMED",
+    recipient_id: recMaria.id,
+    processed_by: manager.id,
+    processed_at: new Date("2026-02-20"),
+    created_at: new Date("2026-02-20"),
+    items: [
+      { product_variant_id: pijMA.id, quantity: 2, unit_price: 150 },
+      { product_variant_id: pijLV.id, quantity: 4, unit_price: 150 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov004.id,
-        product_variant_id: pijMA.id,
-        quantity: 2,
-        unit_price: 150.0,
-        subtotal: 300.0,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov004.id,
-        product_variant_id: pijLV.id,
-        quantity: 4,
-        unit_price: 150.0,
-        subtotal: 600.0,
-      },
-    }),
-  ]);
-
-  // --- MOV-005: DONATION CONFIRMED — Dotación a becario ---
-  const mov005 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260225-0001",
-      movement_type: "DONATION",
-      status: "CONFIRMED",
-      is_donated: true,
-      recipient_id: recAna.id,
-      processed_by: manager.id,
-      total_amount: 0,
-      processed_at: new Date("2026-02-25"),
-      created_at: new Date("2026-02-25"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260225-0001",
+    movement_type: "DONATION",
+    status: "CONFIRMED",
+    recipient_id: recAna.id,
+    processed_by: manager.id,
+    processed_at: new Date("2026-02-25"),
+    created_at: new Date("2026-02-25"),
+    items: [
+      { product_variant_id: pijMA.id, quantity: 1 },
+      { product_variant_id: pijMV.id, quantity: 1 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov005.id,
-        product_variant_id: pijMA.id,
-        quantity: 1,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov005.id,
-        product_variant_id: pijMV.id,
-        quantity: 1,
-      },
-    }),
-  ]);
-
-  // --- MOV-006: DEPARTMENT_DELIVERY CONFIRMED — Entrega a departamento ---
-  const mov006 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260301-0001",
-      movement_type: "DEPARTMENT_DELIVERY",
-      status: "CONFIRMED",
-      department_id: deptAdmin.id,
-      processed_by: manager.id,
-      total_amount: 0,
-      processed_at: new Date("2026-03-01"),
-      created_at: new Date("2026-03-01"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260301-0001",
+    movement_type: "DEPARTMENT_DELIVERY",
+    status: "CONFIRMED",
+    department_id: deptAdmin.id,
+    processed_by: manager.id,
+    processed_at: new Date("2026-03-01"),
+    created_at: new Date("2026-03-01"),
+    items: [
+      { product_variant_id: varResma.id, quantity: 10 },
+      { product_variant_id: varToner.id, quantity: 3 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov006.id,
-        product_variant_id: varResma.id,
-        quantity: 10,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov006.id,
-        product_variant_id: varToner.id,
-        quantity: 3,
-      },
-    }),
-  ]);
-
-  // --- MOV-007: WRITE_OFF CONFIRMED — Baja por deterioro ---
-  const mov007 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260310-0001",
-      movement_type: "WRITE_OFF",
-      status: "CONFIRMED",
-      notes:
-        "Pijama con defecto de fábrica detectado en revisión. Bata dañada por derrame químico.",
-      processed_by: manager.id,
-      total_amount: 0,
-      processed_at: new Date("2026-03-10"),
-      created_at: new Date("2026-03-10"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260310-0001",
+    movement_type: "WRITE_OFF",
+    status: "CONFIRMED",
+    notes:
+      "Pijama con defecto de fábrica detectado en revisión. Bata dañada por derrame químico.",
+    processed_by: manager.id,
+    processed_at: new Date("2026-03-10"),
+    created_at: new Date("2026-03-10"),
+    items: [
+      { product_variant_id: pijMA.id, quantity: 1 },
+      { product_variant_id: batXLM.id, quantity: 1 },
+    ],
   });
 
-  await Promise.all([
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov007.id,
-        product_variant_id: pijMA.id,
-        quantity: 1,
-      },
-    }),
-    prisma.movementItem.create({
-      data: {
-        inventory_movement_id: mov007.id,
-        product_variant_id: batXLM.id,
-        quantity: 1,
-      },
-    }),
-  ]);
-
-  // --- MOV-008: ADJUSTMENT CONFIRMED — Corrección de inventario ---
-  const mov008 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260312-0001",
-      movement_type: "ADJUSTMENT",
-      status: "CONFIRMED",
-      notes:
-        "Corrección tras conteo físico. Se encontraron 2 pijamas verdes M no registrados.",
-      processed_by: admin.id,
-      total_amount: 0,
-      processed_at: new Date("2026-03-12"),
-      created_at: new Date("2026-03-12"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260312-0001",
+    movement_type: "ADJUSTMENT",
+    status: "CONFIRMED",
+    notes:
+      "Corrección tras conteo físico. Se encontraron 2 pijamas verdes M no registrados.",
+    processed_by: admin.id,
+    processed_at: new Date("2026-03-12"),
+    created_at: new Date("2026-03-12"),
+    items: [{ product_variant_id: pijLV.id, quantity: -2 }],
   });
 
-  await prisma.movementItem.create({
-    data: {
-      inventory_movement_id: mov008.id,
-      product_variant_id: pijLV.id,
-      quantity: -2, // Ajuste negativo
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260320-0001",
+    movement_type: "SALE",
+    status: "DRAFT",
+    recipient_id: recCarlos.id,
+    processed_by: manager.id,
+    created_at: new Date("2026-03-20"),
+    items: [{ product_variant_id: pijLA.id, quantity: 2, unit_price: 150 }],
   });
 
-  // --- MOV-009: SALE DRAFT — Venta pendiente (para probar confirmar) ---
-  const mov009 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260320-0001",
-      movement_type: "SALE",
-      status: "DRAFT",
-      recipient_id: recCarlos.id,
-      processed_by: manager.id,
-      total_amount: 300.0,
-      created_at: new Date("2026-03-20"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260321-0001",
+    movement_type: "DONATION",
+    status: "DRAFT",
+    recipient_id: recPedro.id,
+    processed_by: manager.id,
+    created_at: new Date("2026-03-21"),
+    items: [{ product_variant_id: batMF.id, quantity: 1 }],
   });
 
-  await prisma.movementItem.create({
-    data: {
-      inventory_movement_id: mov009.id,
-      product_variant_id: pijLA.id,
-      quantity: 2,
-      unit_price: 150.0,
-      subtotal: 300.0,
-    },
-  });
-
-  // --- MOV-010: DONATION DRAFT — Dotación pendiente (para probar confirmar) ---
-  const mov010 = await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260321-0001",
-      movement_type: "DONATION",
-      status: "DRAFT",
-      is_donated: true,
-      recipient_id: recPedro.id,
-      processed_by: manager.id,
-      total_amount: 0,
-      created_at: new Date("2026-03-21"),
-    },
-  });
-
-  await prisma.movementItem.create({
-    data: {
-      inventory_movement_id: mov010.id,
-      product_variant_id: batMF.id,
-      quantity: 1,
-    },
-  });
-
-  // --- MOV-011: SALE CANCELLED ---
-  await prisma.inventoryMovement.create({
-    data: {
-      movement_number: "MOV-20260118-0001",
-      movement_type: "SALE",
-      status: "CANCELLED",
-      recipient_id: recRoberto.id,
-      processed_by: manager.id,
-      total_amount: 0,
-      cancel_reason:
-        "El destinatario ya no requiere los artículos solicitados.",
-      cancelled_at: new Date("2026-01-20"),
-      created_at: new Date("2026-01-18"),
-    },
+  await createSeedMovement({
+    movement_number: "MOV-20260118-0001",
+    movement_type: "SALE",
+    status: "CANCELLED",
+    recipient_id: recRoberto.id,
+    processed_by: manager.id,
+    created_at: new Date("2026-01-18"),
+    cancelled_at: new Date("2026-01-20"),
+    cancel_reason: "El destinatario ya no requiere los artículos solicitados.",
   });
 
   // ===========================================================================

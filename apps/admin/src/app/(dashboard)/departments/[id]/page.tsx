@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDepartment } from "@/actions/departments";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, PageTransition } from "@upds/ui";
+import { Button, Badge, PageTransition } from "@upds/ui";
 import { DepartmentActions } from "../_components/department-actions";
 
 export default async function DepartmentDetailPage({ params }: { params: Promise<{ id: string }> }) {

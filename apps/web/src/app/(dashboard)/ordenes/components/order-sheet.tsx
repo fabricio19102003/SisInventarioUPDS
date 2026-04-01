@@ -84,9 +84,16 @@ function formatCost(value: unknown): string {
   return `Bs. ${num.toFixed(2)}`;
 }
 
-function variantLabel(v: { size: string; gender: string; color: string }): string {
-  const gLabel = GENDER_LABELS[v.gender as keyof typeof GENDER_LABELS] ?? v.gender;
-  return `${v.size} / ${gLabel} / ${v.color}`;
+function variantLabel(v: {
+  size: string | null;
+  gender: string | null;
+  color: string | null;
+}): string {
+  const size = v.size ?? "Sin talla";
+  const gender = v.gender ?? "UNISEX";
+  const color = v.color ?? "Sin color";
+  const gLabel = GENDER_LABELS[gender as keyof typeof GENDER_LABELS] ?? gender;
+  return `${size} / ${gLabel} / ${color}`;
 }
 
 interface OrderSheetProps {

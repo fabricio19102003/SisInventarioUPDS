@@ -12,9 +12,15 @@ import {
 } from "@upds/ui";
 import { addOrderItem, receiveOrderItems, cancelOrder } from "@/actions/manufacture-orders";
 import { getProducts } from "@/actions/products";
+import type { ManufactureOrderData, ProductData, ProductVariantData } from "@upds/services";
 
 interface OrderActionsProps {
-  order: any;
+  order: ManufactureOrderData;
+}
+
+interface VariantOption {
+  id: string;
+  label: string;
 }
 
 export function OrderActions({ order }: OrderActionsProps) {
@@ -36,16 +42,18 @@ function AddItemDialog({ orderId }: { orderId: string }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [variants, setVariants] = useState<any[]>([]);
+  const [variants, setVariants] = useState<VariantOption[]>([]);
   const [variantId, setVariantId] = useState("");
 
   useEffect(() => {
     if (open) {
       getProducts({ is_active: true, category: "MEDICAL_GARMENT" }).then((r) => {
         if (r.success) {
-          const allVariants: any[] = [];
-          r.data.products.forEach((p: any) => {
-            (p.variants ?? []).filter((v: any) => v.is_active).forEach((v: any) => {
+          const allVariants: VariantOption[] = [];
+          r.data.products.forEach((p: ProductData) => {
+            (p.variants ?? [])
+              .filter((v: ProductVariantData) => v.is_active)
+              .forEach((v: ProductVariantData) => {
               allVariants.push({
                 id: v.id,
                 label: `${p.sku}-${v.sku_suffix} (${p.name} ${v.size ?? ""} ${v.color ?? ""})`,
@@ -114,22 +122,24 @@ function AddItemDialog({ orderId }: { orderId: string }) {
   );
 }
 
-function ReceiveDialog({ order }: { order: any }) {
+function ReceiveDialog({ order }: { order: ManufactureOrderData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const pendingItems = (order.items ?? []).filter((item: any) => item.quantity_received < item.quantity_ordered);
+  const pendingItems = (order.items ?? []).filter(
+    (item) => item.quantity_received < item.quantity_ordered,
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     const items = pendingItems
-      .filter((item: any) => (quantities[item.id] ?? 0) > 0)
-      .map((item: any) => ({
-        item_id: item.id,
+      .filter((item) => (quantities[item.id] ?? 0) > 0)
+      .map((item) => ({
+        manufacture_order_item_id: item.id,
         quantity_received: quantities[item.id] ?? 0,
       }));
 
@@ -163,7 +173,7 @@ function ReceiveDialog({ order }: { order: any }) {
             <p className="text-muted-foreground">Todos los items han sido recibidos</p>
           ) : (
             <div className="space-y-3">
-              {pendingItems.map((item: any) => {
+                {pendingItems.map((item) => {
                 const remaining = item.quantity_ordered - item.quantity_received;
                 const variant = item.product_variant;
                 return (

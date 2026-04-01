@@ -1,18 +1,21 @@
-"use client"
+"use client";
 
-import { usePathname } from "next/navigation"
-import Link from "next/link"
-import { ChevronRight, Home } from "lucide-react"
-import { cn } from "../lib/utils"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ChevronRight, Home } from "lucide-react";
+import { cn } from "../lib/utils";
 
 interface BreadcrumbsProps {
-  /** Map of path segments to display labels */
-  labels?: Record<string, string>
-  /** Base path to start breadcrumbs from (e.g., "/dashboard" or "/") */
-  basePath?: string
-  /** Label for the home/root breadcrumb */
-  homeLabel?: string
-  className?: string
+  labels?: Record<string, string>;
+  basePath?: string;
+  homeLabel?: string;
+  className?: string;
+}
+
+interface BreadcrumbItem {
+  path: string;
+  label: string;
+  isLast: boolean;
 }
 
 export function Breadcrumbs({
@@ -21,29 +24,41 @@ export function Breadcrumbs({
   homeLabel = "Dashboard",
   className,
 }: BreadcrumbsProps) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
-  // Remove basePath prefix and split into segments
-  const relativePath = basePath ? pathname.replace(basePath, "") : pathname
-  const segments = relativePath.split("/").filter(Boolean)
+  const relativePath = basePath ? pathname.replace(basePath, "") : pathname;
+  const segments = relativePath.split("/").filter(Boolean);
 
-  // Don't show breadcrumbs on the root/dashboard page
-  if (segments.length === 0) return null
+  if (segments.length === 0) return null;
 
-  // Build breadcrumb items
-  const items = segments.map((segment, index) => {
-    const path = basePath + "/" + segments.slice(0, index + 1).join("/")
-    const isLast = index === segments.length - 1
+  const items: BreadcrumbItem[] = segments.map(
+    (segment: string, index: number) => {
+      const path = `${basePath}/${segments.slice(0, index + 1).join("/")}`;
+      const isLast = index === segments.length - 1;
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          segment,
+        );
+      const label =
+        labels[segment] ??
+        (isUuid
+          ? "Detalle"
+          : decodeURIComponent(segment)
+              .replace(/-/g, " ")
+              .replace(/\b\w/g, (char) => char.toUpperCase()));
 
-    // Check for a label: exact segment match, or treat UUIDs as "Detalle"
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)
-    const label = labels[segment] ?? (isUuid ? "Detalle" : decodeURIComponent(segment).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()))
-
-    return { path, label, isLast }
-  })
+      return { path, label, isLast };
+    },
+  );
 
   return (
-    <nav aria-label="Breadcrumb" className={cn("flex items-center text-sm text-muted-foreground", className)}>
+    <nav
+      aria-label="Breadcrumb"
+      className={cn(
+        "flex items-center text-sm text-muted-foreground",
+        className,
+      )}
+    >
       <Link
         href={basePath || "/"}
         className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -51,7 +66,7 @@ export function Breadcrumbs({
         <Home className="h-3.5 w-3.5" />
         <span>{homeLabel}</span>
       </Link>
-      {items.map((item) => (
+      {items.map((item: BreadcrumbItem) => (
         <span key={item.path} className="flex items-center">
           <ChevronRight className="mx-2 h-3.5 w-3.5" />
           {item.isLast ? (
@@ -67,5 +82,5 @@ export function Breadcrumbs({
         </span>
       ))}
     </nav>
-  )
+  );
 }

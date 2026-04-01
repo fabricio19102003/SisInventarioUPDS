@@ -118,6 +118,18 @@ function generateOfficeSkuSuffix(): string {
   return "DEFAULT";
 }
 
+function hasNonZeroInitialStock(data: {
+  category: string;
+  variants?: Array<{ initial_stock: number }>;
+  initial_stock?: number;
+}): boolean {
+  if (data.category === "MEDICAL_GARMENT") {
+    return (data.variants ?? []).some((variant) => variant.initial_stock > 0);
+  }
+
+  return (data.initial_stock ?? 0) > 0;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Servicio
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,6 +187,14 @@ export class ProductService {
       }
     }
 
+    if (hasNonZeroInitialStock(data)) {
+      return {
+        success: false,
+        error:
+          "El producto debe crearse con stock 0. Para cargar existencias iniciales use un movimiento de ajuste o entrada.",
+      };
+    }
+
     const product = await this.db.$transaction(
       async (tx: TransactionClient) => {
         // Crear producto
@@ -205,7 +225,7 @@ export class ProductService {
                 size: v.size,
                 gender: v.gender,
                 color: v.color,
-                current_stock: v.initial_stock,
+                current_stock: 0,
               },
             });
           }
@@ -218,7 +238,7 @@ export class ProductService {
               size: null,
               gender: null,
               color: null,
-              current_stock: data.initial_stock ?? 0,
+              current_stock: 0,
             },
           });
         }
@@ -483,6 +503,14 @@ export class ProductService {
 
     const { product_id, size, gender, color, initial_stock } = parsed.data;
 
+    if (initial_stock > 0) {
+      return {
+        success: false,
+        error:
+          "La variante debe crearse con stock 0. Para cargar existencias iniciales use un movimiento de ajuste o entrada.",
+      };
+    }
+
     const product = await this.db.product.findUnique({
       where: { id: product_id },
       select: { id: true, category: true, is_active: true },
@@ -533,7 +561,7 @@ export class ProductService {
             size,
             gender,
             color,
-            current_stock: initial_stock,
+            current_stock: 0,
           },
           select: VARIANT_SELECT,
         });
@@ -549,7 +577,7 @@ export class ProductService {
             size,
             gender,
             color,
-            initial_stock,
+            initial_stock: 0,
           },
           ip_address: ctx?.ip_address,
           user_agent: ctx?.user_agent,

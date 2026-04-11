@@ -252,3 +252,13 @@ Los archivos de test siguen el patrón `**/__tests__/*.test.ts` y usan **Vitest*
 | **Órdenes de Fabricación** | Pedidos a talleres externos con soporte de recepción parcial             |
 | **Destinatarios**          | Estudiantes, personal y becarios que reciben productos                   |
 | **Reportes**               | Financieros, inventario, dotaciones, consumo por departamento, auditoría |
+
+---
+
+## Documentación Detallada
+
+| Documento | Contenido |
+| --------- | --------- |
+| [`docs/flujos-de-trabajo.md`](docs/flujos-de-trabajo.md) | Todos los flujos de trabajo y casos de uso del sistema — autenticación, productos, movimientos, órdenes, catálogos, reportes, auditoría y reglas de stock |
+| [`docs/estructura-excel-inventario.md`](docs/estructura-excel-inventario.md) | Estructura del Excel temporal para registro de inventario previo a producción |
+| [`AGENTS.md`](AGENTS.md) | Reglas de negocio, arquitectura, modelo de datos y convenciones técnicas |

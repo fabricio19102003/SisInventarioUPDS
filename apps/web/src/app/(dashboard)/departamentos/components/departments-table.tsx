@@ -34,6 +34,8 @@ import {
 } from "lucide-react";
 import { deactivateDepartmentAction } from "@/actions/departments";
 import { DepartmentForm } from "./department-form";
+import { can, PERMISSIONS } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -44,6 +46,7 @@ interface DepartmentsTableProps {
   total: number;
   page: number;
   perPage: number;
+  userRole: UserRole;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +58,7 @@ export function DepartmentsTable({
   total,
   page,
   perPage,
+  userRole,
 }: DepartmentsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -66,6 +70,9 @@ export function DepartmentsTable({
   const [selectedDepartment, setSelectedDepartment] = useState<
     DepartmentData | undefined
   >(undefined);
+
+  const canCreate = can(userRole, PERMISSIONS.CATALOG_CREATE);
+  const canEdit = can(userRole, PERMISSIONS.CATALOG_EDIT);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -167,17 +174,19 @@ export function DepartmentsTable({
         const d = row.original;
         return (
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!d.is_active}
-              onClick={() => handleEditClick(d)}
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!d.is_active}
+                onClick={() => handleEditClick(d)}
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Editar</span>
+              </Button>
+            )}
 
-            {d.is_active && (
+            {canEdit && d.is_active && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -238,10 +247,12 @@ export function DepartmentsTable({
             Departamentos internos de la universidad
           </p>
         </div>
-        <Button onClick={handleNewClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Departamento
-        </Button>
+        {canCreate && (
+          <Button onClick={handleNewClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Departamento
+          </Button>
+        )}
       </div>
 
       {/* DataTable */}
@@ -291,11 +302,13 @@ export function DepartmentsTable({
       />
 
       {/* Form Dialog */}
-      <DepartmentForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        department={selectedDepartment}
-      />
+      {(canCreate || canEdit) && (
+        <DepartmentForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          department={selectedDepartment}
+        />
+      )}
     </div>
   );
 }

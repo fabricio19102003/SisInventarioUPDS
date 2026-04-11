@@ -29,6 +29,8 @@ import {
 import { Plus, Pencil, PowerOff, Search } from "lucide-react";
 import { deactivateManufacturerAction } from "@/actions/manufacturers";
 import { ManufacturerForm } from "./manufacturer-form";
+import { can, PERMISSIONS } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -39,6 +41,7 @@ interface ManufacturersTableProps {
   total: number;
   page: number;
   perPage: number;
+  userRole: UserRole;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +53,7 @@ export function ManufacturersTable({
   total,
   page,
   perPage,
+  userRole,
 }: ManufacturersTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -61,6 +65,9 @@ export function ManufacturersTable({
   const [selectedManufacturer, setSelectedManufacturer] = useState<
     ManufacturerData | undefined
   >(undefined);
+
+  const canCreate = can(userRole, PERMISSIONS.CATALOG_CREATE);
+  const canEdit = can(userRole, PERMISSIONS.CATALOG_EDIT);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -168,17 +175,19 @@ export function ManufacturersTable({
         const m = row.original;
         return (
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!m.is_active}
-              onClick={() => handleEditClick(m)}
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!m.is_active}
+                onClick={() => handleEditClick(m)}
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Editar</span>
+              </Button>
+            )}
 
-            {m.is_active && (
+            {canEdit && m.is_active && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -237,10 +246,12 @@ export function ManufacturersTable({
             Talleres externos de indumentaria médica
           </p>
         </div>
-        <Button onClick={handleNewClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Fabricante
-        </Button>
+        {canCreate && (
+          <Button onClick={handleNewClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Fabricante
+          </Button>
+        )}
       </div>
 
       {/* DataTable */}
@@ -290,11 +301,13 @@ export function ManufacturersTable({
       />
 
       {/* Form Dialog */}
-      <ManufacturerForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        manufacturer={selectedManufacturer}
-      />
+      {(canCreate || canEdit) && (
+        <ManufacturerForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          manufacturer={selectedManufacturer}
+        />
+      )}
     </div>
   );
 }

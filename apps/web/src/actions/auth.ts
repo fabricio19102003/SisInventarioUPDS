@@ -9,6 +9,7 @@ import { AuthService } from "@upds/services";
 import { prisma } from "@upds/db";
 import { signIn, signOut } from "@/lib/auth";
 import { requireAuth, requirePermission } from "@/lib/session";
+import { getAuditContext } from "@/lib/audit-context";
 
 const authService = new AuthService(prisma);
 
@@ -49,7 +50,8 @@ export async function logoutAction() {
 
 export async function createUserAction(input: unknown) {
   const session = await requirePermission("user:manage");
-  return authService.createUser(input, session.id);
+  const auditCtx = await getAuditContext();
+  return authService.createUser(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +60,8 @@ export async function createUserAction(input: unknown) {
 
 export async function updateUserAction(input: unknown) {
   const session = await requirePermission("user:manage");
-  return authService.updateUser(input, session.id);
+  const auditCtx = await getAuditContext();
+  return authService.updateUser(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +70,8 @@ export async function updateUserAction(input: unknown) {
 
 export async function deactivateUserAction(userId: string) {
   const session = await requirePermission("user:manage");
-  return authService.deactivateUser(userId, session.id);
+  const auditCtx = await getAuditContext();
+  return authService.deactivateUser(userId, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +80,8 @@ export async function deactivateUserAction(userId: string) {
 
 export async function reactivateUserAction(userId: string) {
   const session = await requirePermission("user:manage");
-  return authService.reactivateUser(userId, session.id);
+  const auditCtx = await getAuditContext();
+  return authService.reactivateUser(userId, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,8 +89,17 @@ export async function reactivateUserAction(userId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function changePasswordAction(input: unknown) {
-  await requireAuth();
-  return authService.changePassword(input);
+  const session = await requireAuth();
+  const auditCtx = await getAuditContext();
+
+  // Sobreescribir user_id con el ID de la sesión activa.
+  // Ignoramos cualquier user_id que el cliente haya enviado — previene IDOR.
+  const safeInput = {
+    ...(input as Record<string, unknown>),
+    user_id: session.id,
+  };
+
+  return authService.changePassword(safeInput, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +108,8 @@ export async function changePasswordAction(input: unknown) {
 
 export async function adminResetPasswordAction(input: unknown) {
   const session = await requirePermission("user:manage");
-  return authService.adminResetPassword(input, session.id);
+  const auditCtx = await getAuditContext();
+  return authService.adminResetPassword(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

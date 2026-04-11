@@ -11,7 +11,10 @@ import {
   MovementStatus,
   MOVEMENT_STATUS_LABELS,
   enumToOptions,
+  can,
+  PERMISSIONS,
 } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 import {
   DataTable,
   DataTableColumnHeader,
@@ -45,6 +48,7 @@ interface MovementsTableProps {
   recipients: RecipientData[];
   departments: DepartmentData[];
   orders: ManufactureOrderData[];
+  userRole: UserRole;
 }
 
 const movementTypeOptions = enumToOptions(MovementType, MOVEMENT_TYPE_LABELS);
@@ -96,6 +100,7 @@ export function MovementsTable({
   recipients,
   departments,
   orders,
+  userRole,
 }: MovementsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -104,6 +109,8 @@ export function MovementsTable({
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<MovementData | null>(null);
+
+  const canCreate = can(userRole, PERMISSIONS.MOVEMENT_CREATE);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -237,10 +244,12 @@ export function MovementsTable({
             Registro de todas las operaciones de inventario
           </p>
         </div>
-        <Button onClick={handleNewClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Movimiento
-        </Button>
+        {canCreate && (
+          <Button onClick={handleNewClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Movimiento
+          </Button>
+        )}
       </div>
 
       {/* DataTable */}
@@ -342,6 +351,7 @@ export function MovementsTable({
         recipients={recipients}
         departments={departments}
         orders={orders}
+        userRole={userRole}
       />
     </div>
   );

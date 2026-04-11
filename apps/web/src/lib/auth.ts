@@ -5,8 +5,10 @@
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { headers } from "next/headers";
 import { prisma } from "@upds/db";
 import { AuthService } from "@upds/services";
+import { parseForwardedIp } from "@upds/services";
 import { loginSchema } from "@upds/validators";
 import type { UserRole } from "@upds/validators";
 import "./auth.types";
@@ -27,7 +29,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const result = await authService.login(parsed.data);
+        const headersList = await headers();
+        const auditCtx = {
+          ip_address:
+            parseForwardedIp(headersList.get("x-forwarded-for")) ??
+            headersList.get("x-real-ip") ??
+            null,
+          user_agent: headersList.get("user-agent") ?? null,
+        };
+
+        const result = await authService.login(parsed.data, auditCtx);
 
         if (!result.success) {
           return null;

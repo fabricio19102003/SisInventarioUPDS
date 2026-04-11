@@ -3,22 +3,26 @@
 import { prisma } from "@upds/db";
 import { ManufacturerService } from "@upds/services";
 import { requirePermission } from "@/lib/session";
+import { getAuditContext } from "@/lib/audit-context";
 
 const service = new ManufacturerService(prisma);
 
 export async function createManufacturerAction(input: unknown) {
   const session = await requirePermission("catalog:create");
-  return service.create(input, session.id);
+  const auditCtx = await getAuditContext();
+  return service.create(input, session.id, auditCtx);
 }
 
 export async function updateManufacturerAction(input: unknown) {
   const session = await requirePermission("catalog:edit");
-  return service.update(input, session.id);
+  const auditCtx = await getAuditContext();
+  return service.update(input, session.id, auditCtx);
 }
 
 export async function deactivateManufacturerAction(manufacturerId: string) {
   const session = await requirePermission("catalog:edit");
-  return service.deactivate(manufacturerId, session.id);
+  const auditCtx = await getAuditContext();
+  return service.deactivate(manufacturerId, session.id, auditCtx);
 }
 
 export async function getManufacturerByIdAction(manufacturerId: string) {

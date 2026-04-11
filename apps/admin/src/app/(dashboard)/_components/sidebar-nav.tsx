@@ -12,6 +12,7 @@ import {
   Users,
   Building2,
   UserCheck,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ const iconMap: Record<string, LucideIcon> = {
   Users,
   Building2,
   UserCheck,
+  ScrollText,
 };
 
 export interface NavItem {

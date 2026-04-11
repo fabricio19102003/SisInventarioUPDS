@@ -12,15 +12,17 @@
     }
   },
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src/",
     "clean": "rimraf node_modules .turbo dist"
   },
   "dependencies": {
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "rimraf": "^6.0.1",
     "typescript": "^5.7.2",
-    "rimraf": "^6.0.1"
+    "vitest": "^4.1.4"
   }
 }

@@ -8,6 +8,7 @@
 import { ManufactureOrderService } from "@upds/services";
 import { prisma } from "@upds/db";
 import { requirePermission } from "@/lib/session";
+import { getAuditContext } from "@/lib/audit-context";
 
 const orderService = new ManufactureOrderService(prisma);
 
@@ -17,7 +18,8 @@ const orderService = new ManufactureOrderService(prisma);
 
 export async function createOrderAction(input: unknown) {
   const session = await requirePermission("manufacture_order:create");
-  return orderService.createOrder(input, session.id);
+  const auditCtx = await getAuditContext();
+  return orderService.createOrder(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,7 +28,8 @@ export async function createOrderAction(input: unknown) {
 
 export async function addOrderItemAction(input: unknown) {
   const session = await requirePermission("manufacture_order:create");
-  return orderService.addItem(input, session.id);
+  const auditCtx = await getAuditContext();
+  return orderService.addItem(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,7 +38,8 @@ export async function addOrderItemAction(input: unknown) {
 
 export async function removeOrderItemAction(itemId: string) {
   const session = await requirePermission("manufacture_order:create");
-  return orderService.removeItem(itemId, session.id);
+  const auditCtx = await getAuditContext();
+  return orderService.removeItem(itemId, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +48,8 @@ export async function removeOrderItemAction(itemId: string) {
 
 export async function startProductionAction(orderId: string) {
   const session = await requirePermission("manufacture_order:create");
-  return orderService.startProduction(orderId, session.id);
+  const auditCtx = await getAuditContext();
+  return orderService.startProduction(orderId, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,7 +58,8 @@ export async function startProductionAction(orderId: string) {
 
 export async function receiveOrderItemsAction(input: unknown) {
   const session = await requirePermission("manufacture_order:receive");
-  return orderService.receiveItems(input, session.id);
+  const auditCtx = await getAuditContext();
+  return orderService.receiveItems(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,7 +68,8 @@ export async function receiveOrderItemsAction(input: unknown) {
 
 export async function cancelOrderAction(input: unknown) {
   const session = await requirePermission("manufacture_order:cancel");
-  return orderService.cancelOrder(input, session.id);
+  const auditCtx = await getAuditContext();
+  return orderService.cancelOrder(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

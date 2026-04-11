@@ -61,13 +61,15 @@ export class DashboardService {
   constructor(private readonly db: PrismaClient) {}
 
   async getStats(): Promise<ServiceResult<DashboardStats>> {
+    // Nota: las variantes con area/min_stock se usan para TANTO stock_by_area
+    // COMO el conteo de alertas de stock bajo — una sola query cubre ambos casos.
+    // Se elimino el groupBy por product_id que no se usaba (variantsByArea).
     const [
       totalActiveProducts,
       totalActiveVariants,
-      allVariantsForLowStock,
+      variantsWithAreaAndStock,
       pendingOrders,
       draftMovements,
-      variantsByArea,
       ordersByStatus,
       recentMovements,
       movementsLast6Months,
@@ -80,12 +82,18 @@ export class DashboardService {
         where: { is_active: true, product: { is_active: true } },
       }),
 
-      // Variantes para calcular alertas de stock bajo
+      // Variantes con area y min_stock: cubre stock_by_area + alertas de bajo stock
+      // en un unico viaje a la base de datos (reemplaza allVariantsForLowStock + variantsWithArea)
       this.db.productVariant.findMany({
         where: { is_active: true, product: { is_active: true } },
         select: {
           current_stock: true,
-          product: { select: { min_stock: true } },
+          product: {
+            select: {
+              warehouse_area: true,
+              min_stock: true,
+            },
+          },
         },
       }),
 
@@ -96,14 +104,6 @@ export class DashboardService {
 
       // Movimientos en borrador
       this.db.inventoryMovement.count({ where: { status: "DRAFT" } }),
-
-      // Stock por area de almacen
-      this.db.productVariant.groupBy({
-        by: ["product_id"],
-        where: { is_active: true, product: { is_active: true } },
-        _sum: { current_stock: true },
-        _count: { id: true },
-      }),
 
       // Ordenes por estado
       this.db.manufactureOrder.groupBy({
@@ -146,33 +146,19 @@ export class DashboardService {
       }),
     ]);
 
-    // Calcular alertas de stock bajo
-    const lowStockAlerts = allVariantsForLowStock.filter(
-      (v) => v.current_stock < v.product.min_stock,
-    ).length;
-
-    // Para stock_by_area necesitamos cruzar con el warehouse_area del producto
-    // Hacemos una query separada mas directa
-    const variantsWithArea = await this.db.productVariant.findMany({
-      where: { is_active: true, product: { is_active: true } },
-      select: {
-        current_stock: true,
-        product: {
-          select: {
-            warehouse_area: true,
-            min_stock: true,
-          },
-        },
-      },
-    });
-
-    // Agrupar por area en aplicacion
+    // Agrupar por area en aplicacion y calcular alertas de bajo stock
+    // en un unico recorrido (evita dos .filter() / .forEach() separados)
     const areaMap = new Map<
       string,
-      { total_variants: number; total_stock: number; low_stock_variants: number }
+      {
+        total_variants: number;
+        total_stock: number;
+        low_stock_variants: number;
+      }
     >();
+    let lowStockAlerts = 0;
 
-    for (const v of variantsWithArea) {
+    for (const v of variantsWithAreaAndStock) {
       const area = v.product.warehouse_area;
       const entry = areaMap.get(area) ?? {
         total_variants: 0,
@@ -183,6 +169,7 @@ export class DashboardService {
       entry.total_stock += v.current_stock;
       if (v.current_stock < v.product.min_stock) {
         entry.low_stock_variants++;
+        lowStockAlerts++;
       }
       areaMap.set(area, entry);
     }
@@ -206,16 +193,20 @@ export class DashboardService {
       department_name: m.department?.name ?? null,
     }));
 
-    // Suprimir advertencias de variables no usadas de groupBy (solo usamos variantsWithArea)
-    void variantsByArea;
-
     // Agrupar movimientos por mes
     const ENTRY_TYPES = new Set(["ENTRY"]);
-    const monthMap = new Map<string, { entries: number; exits: number; total: number }>();
+    const monthMap = new Map<
+      string,
+      { entries: number; exits: number; total: number }
+    >();
 
     // Generar los ultimos 6 meses para asegurar meses vacios
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
+      const d = new Date(
+        new Date().getFullYear(),
+        new Date().getMonth() - i,
+        1,
+      );
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       monthMap.set(key, { entries: 0, exits: 0, total: 0 });
     }
@@ -233,9 +224,9 @@ export class DashboardService {
       }
     }
 
-    const movementsByMonth: MonthlyMovements[] = Array.from(monthMap.entries()).map(
-      ([month, data]) => ({ month, ...data }),
-    );
+    const movementsByMonth: MonthlyMovements[] = Array.from(
+      monthMap.entries(),
+    ).map(([month, data]) => ({ month, ...data }));
 
     return {
       success: true,

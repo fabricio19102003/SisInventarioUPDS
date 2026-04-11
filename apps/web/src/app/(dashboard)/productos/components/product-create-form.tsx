@@ -37,6 +37,7 @@ import {
 } from "@upds/ui";
 import { Plus, Trash2 } from "lucide-react";
 import { createProductAction } from "@/actions/products";
+import { handleAction } from "@/lib/action-utils";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -166,16 +167,14 @@ export function ProductCreateForm({
         variants: isMedical ? values.variants : undefined,
       };
 
-      const result = await createProductAction(payload);
-
-      if (!result.success) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
-        return;
-      }
-
-      toast({ title: "Producto creado correctamente." });
-      onOpenChange(false);
-      router.refresh();
+      await handleAction(createProductAction(payload), {
+        toast,
+        successMessage: "Producto creado correctamente.",
+        onSuccess: () => {
+          onOpenChange(false);
+          router.refresh();
+        },
+      });
     });
   };
 

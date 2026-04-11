@@ -5,7 +5,7 @@
 // Campos inmutables post-creacion: sku, category, garment_type, warehouse_area.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { type PrismaClient, type TransactionClient } from "@upds/db";
+import { type PrismaClient, type TransactionClient, Prisma } from "@upds/db";
 import {
   createProductSchema,
   updateProductSchema,
@@ -771,34 +771,50 @@ export class ProductService {
       ];
     }
 
-    // Para low_stock, obtenemos todos los productos que coincidan con los
-    // demas filtros y luego filtramos en aplicacion (comparacion cross-field
-    // current_stock < min_stock no es posible directamente en Prisma)
+    // Para low_stock, usamos $queryRaw para obtener los IDs de productos que
+    // tienen al menos una variante activa con current_stock < min_stock.
+    // Esto evita traer toda la tabla a memoria para filtrar en aplicacion.
     if (low_stock) {
-      const allProducts = await this.db.product.findMany({
-        where,
-        select: PRODUCT_SELECT,
-        orderBy: { created_at: "desc" },
-      });
+      type LowStockProductId = { product_id: string };
+      const lowStockRows = await this.db.$queryRaw<
+        LowStockProductId[]
+      >(Prisma.sql`
+        SELECT DISTINCT p.id AS product_id
+        FROM products p
+        JOIN product_variants pv ON pv.product_id = p.id
+        WHERE pv.is_active = true
+          AND p.is_active = true
+          AND pv.current_stock < p.min_stock
+      `);
 
-      const filtered = allProducts.filter(
-        (p: {
-          min_stock: number;
-          variants: Array<{ is_active: boolean; current_stock: number }>;
-        }) =>
-          p.variants.some(
-            (v: { is_active: boolean; current_stock: number }) =>
-              v.is_active && v.current_stock < p.min_stock,
-          ),
-      );
+      const lowStockProductIds = lowStockRows.map((r) => r.product_id);
 
-      const total = filtered.length;
-      const paginated = filtered.slice((page - 1) * per_page, page * per_page);
+      // Si no hay ningun producto con bajo stock, retornar vacio de inmediato
+      if (lowStockProductIds.length === 0) {
+        return {
+          success: true,
+          data: { products: [], total: 0, page, per_page },
+        };
+      }
+
+      // Combinar los filtros base con los IDs de bajo stock
+      const lowStockWhere = { ...where, id: { in: lowStockProductIds } };
+
+      const [products, total] = await this.db.$transaction([
+        this.db.product.findMany({
+          where: lowStockWhere,
+          select: PRODUCT_SELECT,
+          orderBy: { created_at: "desc" },
+          skip: (page - 1) * per_page,
+          take: per_page,
+        }),
+        this.db.product.count({ where: lowStockWhere }),
+      ]);
 
       return {
         success: true,
         data: {
-          products: paginated as ProductData[],
+          products: products as ProductData[],
           total,
           page,
           per_page,
@@ -829,63 +845,56 @@ export class ProductService {
 
   /**
    * Retorna todas las variantes activas cuyo current_stock < min_stock
-   * del producto padre. Query en tiempo real, no tabla separada.
+   * del producto padre. Usa $queryRaw para mover el filtro cross-field al DB,
+   * evitando traer todas las variantes a memoria.
    */
   async getLowStockAlerts(): Promise<ServiceResult<LowStockAlert[]>> {
-    const variants = await this.db.productVariant.findMany({
-      where: {
-        is_active: true,
-        product: { is_active: true },
-      },
-      select: {
-        id: true,
-        sku_suffix: true,
-        size: true,
-        gender: true,
-        color: true,
-        current_stock: true,
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            min_stock: true,
-          },
-        },
-      },
-    });
-
-    // Tipo inferido del query
-    type VariantWithProduct = {
-      id: string;
+    // Tipo de fila retornada por la query raw
+    type LowStockRow = {
+      variant_id: string;
       sku_suffix: string;
       size: string | null;
       gender: string | null;
       color: string | null;
       current_stock: number;
-      product: {
-        id: string;
-        name: string;
-        sku: string;
-        min_stock: number;
-      };
+      product_id: string;
+      product_name: string;
+      product_sku: string;
+      min_stock: number;
     };
 
-    // Filtrar en aplicacion: current_stock < product.min_stock
-    const alerts: LowStockAlert[] = (variants as VariantWithProduct[])
-      .filter((v) => v.current_stock < v.product.min_stock)
-      .map((v) => ({
-        product_id: v.product.id,
-        product_name: v.product.name,
-        product_sku: v.product.sku,
-        min_stock: v.product.min_stock,
-        variant_id: v.id,
-        variant_sku_suffix: v.sku_suffix,
-        size: v.size,
-        gender: v.gender,
-        color: v.color,
-        current_stock: v.current_stock,
-      }));
+    const rows = await this.db.$queryRaw<LowStockRow[]>(Prisma.sql`
+      SELECT
+        pv.id            AS variant_id,
+        pv.sku_suffix,
+        pv.size::text    AS size,
+        pv.gender::text  AS gender,
+        pv.color,
+        pv.current_stock,
+        p.id             AS product_id,
+        p.name           AS product_name,
+        p.sku            AS product_sku,
+        p.min_stock
+      FROM product_variants pv
+      JOIN products p ON p.id = pv.product_id
+      WHERE pv.is_active = true
+        AND p.is_active = true
+        AND pv.current_stock < p.min_stock
+      ORDER BY p.name, pv.sku_suffix
+    `);
+
+    const alerts: LowStockAlert[] = rows.map((row) => ({
+      product_id: row.product_id,
+      product_name: row.product_name,
+      product_sku: row.product_sku,
+      min_stock: Number(row.min_stock),
+      variant_id: row.variant_id,
+      variant_sku_suffix: row.sku_suffix,
+      size: row.size,
+      gender: row.gender,
+      color: row.color,
+      current_stock: Number(row.current_stock),
+    }));
 
     return { success: true, data: alerts };
   }

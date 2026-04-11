@@ -19,6 +19,7 @@
     "@upds/types": "workspace:*",
     "@upds/ui": "workspace:*",
     "@upds/validators": "workspace:*",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.469.0",
     "next": "^15.1.0",
     "next-auth": "^5.0.0-beta.25",

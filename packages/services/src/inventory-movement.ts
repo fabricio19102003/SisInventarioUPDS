@@ -13,7 +13,7 @@ import {
   cancelMovementSchema,
   movementFiltersSchema,
 } from "@upds/validators";
-import { createAuditLog } from "./audit";
+import { createAuditLog, type AuditPayload } from "./audit";
 import type { ServiceResult, AuditContext } from "./auth";
 
 const SERIALIZABLE_RETRY_LIMIT = 3;
@@ -454,7 +454,13 @@ export class InventoryMovementService {
         is_active: true,
         current_stock: true,
         product: {
-          select: { id: true, warehouse_area: true, name: true, sku: true },
+          select: {
+            id: true,
+            warehouse_area: true,
+            name: true,
+            sku: true,
+            category: true,
+          },
         },
       },
     });
@@ -470,15 +476,26 @@ export class InventoryMovementService {
       };
     }
 
-    // DEPARTMENT_DELIVERY solo permite productos de area OFFICE
+    // SALE y DONATION solo permiten indumentaria medica (MEDICAL_GARMENT)
     if (
-      movement.movement_type === "DEPARTMENT_DELIVERY" &&
-      variant.product.warehouse_area !== "OFFICE"
+      (movement.movement_type === "SALE" ||
+        movement.movement_type === "DONATION") &&
+      variant.product.category !== "MEDICAL_GARMENT"
     ) {
       return {
         success: false,
-        error:
-          "Las entregas a departamento solo permiten productos del area OFFICE",
+        error: `Solo se pueden vender o donar productos de indumentaria medica. El producto '${variant.product.name}' es material de oficina.`,
+      };
+    }
+
+    // DEPARTMENT_DELIVERY solo permite material de oficina (OFFICE_SUPPLY)
+    if (
+      movement.movement_type === "DEPARTMENT_DELIVERY" &&
+      variant.product.category !== "OFFICE_SUPPLY"
+    ) {
+      return {
+        success: false,
+        error: `Las entregas a departamento solo admiten materiales de oficina. El producto '${variant.product.name}' es indumentaria medica.`,
       };
     }
 
@@ -752,7 +769,7 @@ export class InventoryMovementService {
     }
 
     const execute = async (tx: TransactionClient) => {
-      const stockChanges: Record<string, unknown> = {};
+      const stockChanges: AuditPayload = {};
 
       if (movement.movement_type === "ENTRY" && movement.manufacture_order_id) {
         const groupedItems = groupMovementQuantitiesByVariant(movement.items);

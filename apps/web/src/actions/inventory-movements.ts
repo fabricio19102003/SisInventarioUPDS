@@ -8,6 +8,7 @@
 import { InventoryMovementService } from "@upds/services";
 import { prisma } from "@upds/db";
 import { requirePermission } from "@/lib/session";
+import { getAuditContext } from "@/lib/audit-context";
 
 const movementService = new InventoryMovementService(prisma);
 
@@ -17,7 +18,8 @@ const movementService = new InventoryMovementService(prisma);
 
 export async function createMovementAction(input: unknown) {
   const session = await requirePermission("movement:create");
-  return movementService.createMovement(input, session.id);
+  const auditCtx = await getAuditContext();
+  return movementService.createMovement(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,7 +28,8 @@ export async function createMovementAction(input: unknown) {
 
 export async function addMovementItemAction(input: unknown) {
   const session = await requirePermission("movement:create");
-  return movementService.addItem(input, session.id);
+  const auditCtx = await getAuditContext();
+  return movementService.addItem(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,7 +38,8 @@ export async function addMovementItemAction(input: unknown) {
 
 export async function removeMovementItemAction(itemId: string) {
   const session = await requirePermission("movement:create");
-  return movementService.removeItem(itemId, session.id);
+  const auditCtx = await getAuditContext();
+  return movementService.removeItem(itemId, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +48,12 @@ export async function removeMovementItemAction(itemId: string) {
 
 export async function confirmMovementAction(movementId: string) {
   const session = await requirePermission("movement:confirm");
-  return movementService.confirmMovement({ movement_id: movementId }, session.id);
+  const auditCtx = await getAuditContext();
+  return movementService.confirmMovement(
+    { movement_id: movementId },
+    session.id,
+    auditCtx,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,7 +62,8 @@ export async function confirmMovementAction(movementId: string) {
 
 export async function cancelMovementAction(input: unknown) {
   const session = await requirePermission("movement:cancel");
-  return movementService.cancelMovement(input, session.id);
+  const auditCtx = await getAuditContext();
+  return movementService.cancelMovement(input, session.id, auditCtx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -8,7 +8,10 @@ import {
   ManufactureOrderStatus,
   MANUFACTURE_ORDER_STATUS_LABELS,
   enumToOptions,
+  can,
+  PERMISSIONS,
 } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 import {
   DataTable,
   DataTableColumnHeader,
@@ -40,6 +43,7 @@ interface OrdersTableProps {
   perPage: number;
   manufacturers: ManufacturerData[];
   products: ProductData[];
+  userRole: UserRole;
 }
 
 const statusOptions = enumToOptions(ManufactureOrderStatus, MANUFACTURE_ORDER_STATUS_LABELS);
@@ -79,6 +83,7 @@ export function OrdersTable({
   perPage,
   manufacturers,
   products,
+  userRole,
 }: OrdersTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -87,6 +92,8 @@ export function OrdersTable({
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ManufactureOrderData | null>(null);
+
+  const canCreate = can(userRole, PERMISSIONS.MANUFACTURE_ORDER_CREATE);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -222,10 +229,12 @@ export function OrdersTable({
             Pedidos a talleres externos de indumentaria médica
           </p>
         </div>
-        <Button onClick={handleNewClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Orden
-        </Button>
+        {canCreate && (
+          <Button onClick={handleNewClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Orden
+          </Button>
+        )}
       </div>
 
       {/* DataTable */}
@@ -330,6 +339,7 @@ export function OrdersTable({
         manufacturers={manufacturers}
         products={products}
         toast={toast}
+        userRole={userRole}
       />
     </div>
   );

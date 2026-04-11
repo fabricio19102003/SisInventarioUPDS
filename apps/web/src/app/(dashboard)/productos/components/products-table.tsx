@@ -10,7 +10,10 @@ import {
   WAREHOUSE_AREA_LABELS,
   ProductCategory,
   enumToOptions,
+  can,
+  PERMISSIONS,
 } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 import {
   DataTable,
   DataTableColumnHeader,
@@ -46,6 +49,7 @@ import {
   deactivateProductAction,
   reactivateProductAction,
 } from "@/actions/products";
+import { handleAction } from "@/lib/action-utils";
 import { ProductCreateForm } from "./product-create-form";
 import { ProductEditForm } from "./product-edit-form";
 import { ProductVariantsSheet } from "./product-variants-sheet";
@@ -60,6 +64,7 @@ interface ProductsTableProps {
   total: number;
   page: number;
   perPage: number;
+  userRole: UserRole;
 }
 
 const categoryOptions = enumToOptions(ProductCategory, PRODUCT_CATEGORY_LABELS);
@@ -94,6 +99,7 @@ export function ProductsTable({
   total,
   page,
   perPage,
+  userRole,
 }: ProductsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -104,6 +110,10 @@ export function ProductsTable({
   const [createOpen, setCreateOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<ProductData | null>(null);
   const [sheetProduct, setSheetProduct] = useState<ProductData | null>(null);
+
+  const canCreate = can(userRole, PERMISSIONS.PRODUCT_CREATE);
+  const canEdit = can(userRole, PERMISSIONS.PRODUCT_EDIT);
+  const canDeactivate = can(userRole, PERMISSIONS.PRODUCT_DEACTIVATE);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -135,25 +145,21 @@ export function ProductsTable({
 
   function handleDeactivate(productId: string) {
     startTransition(async () => {
-      const result = await deactivateProductAction(productId);
-      if (!result.success) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
-        return;
-      }
-      toast({ title: "Producto desactivado correctamente." });
-      router.refresh();
+      await handleAction(deactivateProductAction(productId), {
+        toast,
+        successMessage: "Producto desactivado correctamente.",
+        onSuccess: () => router.refresh(),
+      });
     });
   }
 
   function handleReactivate(productId: string) {
     startTransition(async () => {
-      const result = await reactivateProductAction(productId);
-      if (!result.success) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
-        return;
-      }
-      toast({ title: "Producto reactivado correctamente." });
-      router.refresh();
+      await handleAction(reactivateProductAction(productId), {
+        toast,
+        successMessage: "Producto reactivado correctamente.",
+        onSuccess: () => router.refresh(),
+      });
     });
   }
 
@@ -307,65 +313,69 @@ export function ProductsTable({
               <span className="sr-only">Ver variantes</span>
             </Button>
 
-            {/* Editar */}
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!p.is_active}
-              onClick={() => setEditProduct(p)}
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
-
-            {/* Desactivar / Reactivar */}
-            {p.is_active ? (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={isPending}
-                  >
-                    <PowerOff className="h-4 w-4 text-destructive" />
-                    <span className="sr-only">Desactivar</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      ¿Desactivar producto?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Se desactivará{" "}
-                      <strong>
-                        {p.name} ({p.sku})
-                      </strong>{" "}
-                      junto con todas sus variantes. Solo es posible
-                      si todas las variantes tienen stock en cero.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      onClick={() => handleDeactivate(p.id)}
-                    >
-                      Desactivar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : (
+            {/* Editar — solo para roles con permisos */}
+            {canEdit && (
               <Button
                 variant="ghost"
                 size="icon"
-                disabled={isPending}
-                onClick={() => handleReactivate(p.id)}
+                disabled={!p.is_active}
+                onClick={() => setEditProduct(p)}
               >
-                <RotateCcw className="h-4 w-4 text-green-600" />
-                <span className="sr-only">Reactivar</span>
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Editar</span>
               </Button>
+            )}
+
+            {/* Desactivar / Reactivar — solo para roles con permisos */}
+            {canDeactivate && (
+              p.is_active ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isPending}
+                    >
+                      <PowerOff className="h-4 w-4 text-destructive" />
+                      <span className="sr-only">Desactivar</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        ¿Desactivar producto?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se desactivará{" "}
+                        <strong>
+                          {p.name} ({p.sku})
+                        </strong>{" "}
+                        junto con todas sus variantes. Solo es posible
+                        si todas las variantes tienen stock en cero.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => handleDeactivate(p.id)}
+                      >
+                        Desactivar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={isPending}
+                  onClick={() => handleReactivate(p.id)}
+                >
+                  <RotateCcw className="h-4 w-4 text-green-600" />
+                  <span className="sr-only">Reactivar</span>
+                </Button>
+              )
             )}
           </div>
         );
@@ -387,10 +397,12 @@ export function ProductsTable({
             Indumentaria médica y material de oficina
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Producto
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Producto
+          </Button>
+        )}
       </div>
 
       {/* DataTable */}
@@ -478,9 +490,11 @@ export function ProductsTable({
       />
 
       {/* Dialogs / Sheet */}
-      <ProductCreateForm open={createOpen} onOpenChange={setCreateOpen} />
+      {canCreate && (
+        <ProductCreateForm open={createOpen} onOpenChange={setCreateOpen} />
+      )}
 
-      {editProduct && (
+      {canEdit && editProduct && (
         <ProductEditForm
           open={!!editProduct}
           onOpenChange={(v) => { if (!v) setEditProduct(null); }}

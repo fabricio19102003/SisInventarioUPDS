@@ -1,6 +1,7 @@
 import { listOrdersAction } from "@/actions/manufacture-orders";
 import { listManufacturersAction } from "@/actions/manufacturers";
 import { listProductsAction } from "@/actions/products";
+import { requireAuth } from "@/lib/session";
 import { PageTransition } from "@upds/ui";
 import { OrdersTable } from "./components/orders-table";
 
@@ -9,7 +10,7 @@ export default async function OrdenesPage({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const params = await searchParams;
+  const [session, params] = await Promise.all([requireAuth(), searchParams]);
 
   const [ordersResult, manufacturersResult, productsResult] = await Promise.all([
     listOrdersAction({
@@ -42,6 +43,7 @@ export default async function OrdenesPage({
         perPage={ordersResult.data.per_page}
         manufacturers={manufacturersResult.success ? manufacturersResult.data.manufacturers : []}
         products={productsResult.success ? productsResult.data.products : []}
+        userRole={session.role}
       />
     </PageTransition>
   );

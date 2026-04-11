@@ -1,4 +1,5 @@
 import { listManufacturersAction } from "@/actions/manufacturers";
+import { requireAuth } from "@/lib/session";
 import { PageTransition } from "@upds/ui";
 import { ManufacturersTable } from "./components/manufacturers-table";
 
@@ -7,7 +8,7 @@ export default async function FabricantesPage({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const params = await searchParams;
+  const [session, params] = await Promise.all([requireAuth(), searchParams]);
 
   const result = await listManufacturersAction({
     search: params.search || undefined,
@@ -36,6 +37,7 @@ export default async function FabricantesPage({
         total={result.data.total}
         page={result.data.page}
         perPage={result.data.per_page}
+        userRole={session.role}
       />
     </PageTransition>
   );

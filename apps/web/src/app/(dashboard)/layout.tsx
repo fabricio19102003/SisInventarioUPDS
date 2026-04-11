@@ -10,9 +10,15 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   destinatarios: "Destinatarios",
   movimientos: "Movimientos",
   ordenes: "Ordenes de Fabricacion",
-  usuarios: "Usuarios",
   nuevo: "Nuevo",
   editar: "Editar",
+  reportes: "Reportes",
+  financiero: "Financiero",
+  inventario: "Inventario",
+  dotaciones: "Dotaciones",
+  "consumo-departamentos": "Consumo por Departamentos",
+  bajas: "Bajas",
+  perfil: "Mi Perfil",
 };
 
 export default async function DashboardLayout({

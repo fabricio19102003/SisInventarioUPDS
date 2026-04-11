@@ -3,6 +3,7 @@ import { listProductsAction } from "@/actions/products";
 import { listRecipientsAction } from "@/actions/recipients";
 import { listDepartmentsAction } from "@/actions/departments";
 import { listOrdersAction } from "@/actions/manufacture-orders";
+import { requireAuth } from "@/lib/session";
 import { PageTransition } from "@upds/ui";
 import { MovementsTable } from "./components/movements-table";
 
@@ -11,7 +12,7 @@ export default async function MovimientosPage({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const params = await searchParams;
+  const [session, params] = await Promise.all([requireAuth(), searchParams]);
 
   const [
     movementsResult,
@@ -54,6 +55,7 @@ export default async function MovimientosPage({
         recipients={recipientsResult.success ? recipientsResult.data.recipients : []}
         departments={departmentsResult.success ? departmentsResult.data.departments : []}
         orders={ordersResult.success ? ordersResult.data.orders : []}
+        userRole={session.role}
       />
     </PageTransition>
   );

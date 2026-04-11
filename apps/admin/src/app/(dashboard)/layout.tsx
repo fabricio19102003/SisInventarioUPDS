@@ -13,27 +13,6 @@ function buildNavSections(role: string): NavSection[] {
         { label: "Dashboard", href: "/dashboard", iconName: "LayoutDashboard" },
       ],
     },
-    {
-      title: "Inventario",
-      items: [
-        { label: "Productos", href: "/products", iconName: "Package" },
-        { label: "Movimientos", href: "/inventory-movements", iconName: "ArrowLeftRight" },
-      ],
-    },
-    {
-      title: "Fabricacion",
-      items: [
-        { label: "Fabricantes", href: "/manufacturers", iconName: "Factory" },
-        { label: "Ordenes de Fabricacion", href: "/manufacture-orders", iconName: "ClipboardList" },
-      ],
-    },
-    {
-      title: "Catalogos",
-      items: [
-        { label: "Destinatarios", href: "/recipients", iconName: "UserCheck" },
-        { label: "Departamentos", href: "/departments", iconName: "Building2" },
-      ],
-    },
   ];
 
   if (role === "ADMIN") {
@@ -41,6 +20,7 @@ function buildNavSections(role: string): NavSection[] {
       title: "Sistema",
       items: [
         { label: "Usuarios", href: "/users", iconName: "Users" },
+        { label: "Auditoría", href: "/audit-logs", iconName: "ScrollText" },
       ],
     });
   }
@@ -50,15 +30,8 @@ function buildNavSections(role: string): NavSection[] {
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
-  departments: "Departamentos",
-  manufacturers: "Fabricantes",
-  recipients: "Destinatarios",
-  products: "Productos",
   users: "Usuarios",
-  "inventory-movements": "Movimientos",
-  "manufacture-orders": "Ordenes de Fabricacion",
-  new: "Nuevo",
-  edit: "Editar",
+  "audit-logs": "Auditoría",
 };
 
 export default async function DashboardLayout({
@@ -69,6 +42,10 @@ export default async function DashboardLayout({
   const session = await auth();
 
   if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "ADMIN") {
     redirect("/login");
   }
 

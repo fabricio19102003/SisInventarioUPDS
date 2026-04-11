@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { deactivateRecipientAction } from "@/actions/recipients";
 import { RecipientForm } from "./recipient-form";
+import { can, PERMISSIONS } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -49,6 +51,7 @@ interface RecipientsTableProps {
   total: number;
   page: number;
   perPage: number;
+  userRole: UserRole;
 }
 
 const typeOptions = enumToOptions(RecipientType, RECIPIENT_TYPE_LABELS);
@@ -62,6 +65,7 @@ export function RecipientsTable({
   total,
   page,
   perPage,
+  userRole,
 }: RecipientsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -73,6 +77,9 @@ export function RecipientsTable({
   const [selectedRecipient, setSelectedRecipient] = useState<
     RecipientData | undefined
   >(undefined);
+
+  const canCreate = can(userRole, PERMISSIONS.CATALOG_CREATE);
+  const canEdit = can(userRole, PERMISSIONS.CATALOG_EDIT);
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -195,17 +202,19 @@ export function RecipientsTable({
         const r = row.original;
         return (
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!r.is_active}
-              onClick={() => handleEditClick(r)}
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!r.is_active}
+                onClick={() => handleEditClick(r)}
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Editar</span>
+              </Button>
+            )}
 
-            {r.is_active && (
+            {canEdit && r.is_active && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -265,10 +274,12 @@ export function RecipientsTable({
             Estudiantes, personal y becarios que reciben productos
           </p>
         </div>
-        <Button onClick={handleNewClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Destinatario
-        </Button>
+        {canCreate && (
+          <Button onClick={handleNewClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Destinatario
+          </Button>
+        )}
       </div>
 
       {/* DataTable */}
@@ -332,11 +343,13 @@ export function RecipientsTable({
       />
 
       {/* Form Dialog */}
-      <RecipientForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        recipient={selectedRecipient}
-      />
+      {(canCreate || canEdit) && (
+        <RecipientForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          recipient={selectedRecipient}
+        />
+      )}
     </div>
   );
 }

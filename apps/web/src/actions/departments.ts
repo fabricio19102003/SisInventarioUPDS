@@ -3,22 +3,26 @@
 import { prisma } from "@upds/db";
 import { DepartmentService } from "@upds/services";
 import { requirePermission } from "@/lib/session";
+import { getAuditContext } from "@/lib/audit-context";
 
 const service = new DepartmentService(prisma);
 
 export async function createDepartmentAction(input: unknown) {
   const session = await requirePermission("catalog:create");
-  return service.create(input, session.id);
+  const auditCtx = await getAuditContext();
+  return service.create(input, session.id, auditCtx);
 }
 
 export async function updateDepartmentAction(input: unknown) {
   const session = await requirePermission("catalog:edit");
-  return service.update(input, session.id);
+  const auditCtx = await getAuditContext();
+  return service.update(input, session.id, auditCtx);
 }
 
 export async function deactivateDepartmentAction(departmentId: string) {
   const session = await requirePermission("catalog:edit");
-  return service.deactivate(departmentId, session.id);
+  const auditCtx = await getAuditContext();
+  return service.deactivate(departmentId, session.id, auditCtx);
 }
 
 export async function getDepartmentByIdAction(departmentId: string) {

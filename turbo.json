@@ -6,7 +6,7 @@
     "build": {
       "dependsOn": ["^build", "^db:generate"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL"]
+      "env": ["DATABASE_URL", "AUTH_SECRET", "AUTH_URL", "AUTH_TRUST_HOST"]
     },
     "dev": {
       "dependsOn": ["^db:generate"],
@@ -14,10 +14,10 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^db:generate"]
     },
     "type-check": {
-      "dependsOn": ["^build", "^db:generate"]
+      "dependsOn": ["^db:generate"]
     },
     "db:generate": {
       "cache": false
@@ -36,6 +36,10 @@
       "persistent": true
     },
     "clean": {
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["^build"],
       "cache": false
     }
   }

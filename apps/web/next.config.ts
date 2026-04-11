@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
     "@upds/db",
     "@upds/types",
   ],
+  async redirects() {
+    // Redirect removed user-management route (now lives in apps/admin) to web dashboard
+    return [
+      {
+        source: "/usuarios",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/usuarios/:path*",
+        destination: "/",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

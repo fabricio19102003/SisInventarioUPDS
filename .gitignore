@@ -35,3 +35,9 @@ Thumbs.db
 
 # IDE
 .vscode/settings.json
+
+# agent teams lite
+.atl/
+
+# env examples (allow)
+!.env.example

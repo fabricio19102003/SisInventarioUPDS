@@ -1,4 +1,5 @@
 import { listProductsAction } from "@/actions/products";
+import { requireAuth } from "@/lib/session";
 import { PageTransition } from "@upds/ui";
 import { ProductsTable } from "./components/products-table";
 
@@ -7,7 +8,10 @@ export default async function ProductosPage({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const params = await searchParams;
+  const [session, params] = await Promise.all([
+    requireAuth(),
+    searchParams,
+  ]);
 
   const result = await listProductsAction({
     search: params.search || undefined,
@@ -39,6 +43,7 @@ export default async function ProductosPage({
         total={result.data.total}
         page={result.data.page}
         perPage={result.data.per_page}
+        userRole={session.role}
       />
     </PageTransition>
   );

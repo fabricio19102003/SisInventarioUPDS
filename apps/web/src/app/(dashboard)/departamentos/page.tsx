@@ -1,4 +1,5 @@
 import { listDepartmentsAction } from "@/actions/departments";
+import { requireAuth } from "@/lib/session";
 import { PageTransition } from "@upds/ui";
 import { DepartmentsTable } from "./components/departments-table";
 
@@ -7,7 +8,7 @@ export default async function DepartamentosPage({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const params = await searchParams;
+  const [session, params] = await Promise.all([requireAuth(), searchParams]);
 
   const result = await listDepartmentsAction({
     search: params.search || undefined,
@@ -36,6 +37,7 @@ export default async function DepartamentosPage({
         total={result.data.total}
         page={result.data.page}
         perPage={result.data.per_page}
+        userRole={session.role}
       />
     </PageTransition>
   );

@@ -68,7 +68,7 @@ export async function requireAuth(): Promise<SessionUser> {
 /**
  * Exige que el usuario tenga un permiso especifico.
  * Redirige a /login si no hay sesion.
- * Lanza error si el usuario no tiene el permiso requerido.
+ * Redirige a /forbidden si el usuario no tiene el permiso requerido.
  *
  * @example
  * const user = await requirePermission("user:manage");
@@ -79,7 +79,7 @@ export async function requirePermission(
   const user = await requireAuth();
 
   if (!can(user.role, permission)) {
-    throw new Error("No autorizado");
+    redirect("/forbidden");
   }
 
   return user;

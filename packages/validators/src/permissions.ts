@@ -54,7 +54,10 @@ export const PERMISSIONS = {
   // Reportes
   REPORT_FINANCIAL: "report:financial",
   REPORT_INVENTORY: "report:inventory",
+  REPORT_MOVEMENTS: "report:movements",
   REPORT_DONATIONS: "report:donations",
+  REPORT_CONSUMPTION: "report:consumption",
+  REPORT_WRITE_OFFS: "report:write_offs",
   REPORT_EXPORT: "report:export",
 
   // Administracion
@@ -109,7 +112,10 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     // Reportes
     PERMISSIONS.REPORT_FINANCIAL,
     PERMISSIONS.REPORT_INVENTORY,
+    PERMISSIONS.REPORT_MOVEMENTS,
     PERMISSIONS.REPORT_DONATIONS,
+    PERMISSIONS.REPORT_CONSUMPTION,
+    PERMISSIONS.REPORT_WRITE_OFFS,
     PERMISSIONS.REPORT_EXPORT,
 
     // Administracion (exclusivo ADMIN)
@@ -151,7 +157,10 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     // Reportes
     PERMISSIONS.REPORT_FINANCIAL,
     PERMISSIONS.REPORT_INVENTORY,
+    PERMISSIONS.REPORT_MOVEMENTS,
     PERMISSIONS.REPORT_DONATIONS,
+    PERMISSIONS.REPORT_CONSUMPTION,
+    PERMISSIONS.REPORT_WRITE_OFFS,
     PERMISSIONS.REPORT_EXPORT,
 
     // Sin acceso a: USER_MANAGE, AUDIT_VIEW
@@ -166,9 +175,10 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     PERMISSIONS.MANUFACTURE_ORDER_VIEW,
     PERMISSIONS.CATALOG_VIEW,
     PERMISSIONS.REPORT_INVENTORY,
+    PERMISSIONS.REPORT_MOVEMENTS,
     PERMISSIONS.REPORT_DONATIONS,
 
-    // Sin acceso a: crear, editar, confirmar, cancelar, exportar, financieros, admin
+    // Sin acceso a: crear, editar, confirmar, cancelar, exportar, financieros, consumo, bajas, admin
   ]),
 };
 

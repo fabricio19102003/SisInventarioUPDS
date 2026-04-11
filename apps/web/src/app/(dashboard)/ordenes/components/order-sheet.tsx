@@ -6,7 +6,8 @@ import type { ManufactureOrderData, ManufacturerData, ProductData } from "@upds/
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { MANUFACTURE_ORDER_STATUS_LABELS, GENDER_LABELS } from "@upds/validators";
+import { MANUFACTURE_ORDER_STATUS_LABELS, GENDER_LABELS, can, PERMISSIONS } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 import {
   Sheet,
   SheetContent,
@@ -103,6 +104,7 @@ interface OrderSheetProps {
   manufacturers: ManufacturerData[];
   products: ProductData[];
   toast: (opts: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
+  userRole: UserRole;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +118,7 @@ export function OrderSheet({
   manufacturers,
   products,
   toast,
+  userRole,
 }: OrderSheetProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -136,6 +139,10 @@ export function OrderSheet({
   const [cancelReason, setCancelReason] = useState("");
 
   const phase = getPhase(currentOrder);
+
+  const canCreate = can(userRole, PERMISSIONS.MANUFACTURE_ORDER_CREATE);
+  const canReceive = can(userRole, PERMISSIONS.MANUFACTURE_ORDER_RECEIVE);
+  const canCancelOrder = can(userRole, PERMISSIONS.MANUFACTURE_ORDER_CANCEL);
 
   // Create form
   const {
@@ -585,47 +592,55 @@ export function OrderSheet({
             </div>
 
             {/* Actions */}
-            <Separator className="my-4" />
-            <div className="flex gap-2">
-              {/* Iniciar producción */}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    className="flex-1"
-                    disabled={isPending || currentOrder.items.length === 0}
-                  >
-                    <PlayCircle className="mr-2 h-4 w-4" />
-                    Iniciar Producción
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Iniciar producción?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      La orden pasará a <strong>En Progreso</strong>. Ya no
-                      podrás agregar ni quitar ítems.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleStartProduction}>
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+            {(canCreate || canCancelOrder) && (
+              <>
+                <Separator className="my-4" />
+                <div className="flex gap-2">
+                  {/* Iniciar producción */}
+                  {canCreate && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          className="flex-1"
+                          disabled={isPending || currentOrder.items.length === 0}
+                        >
+                          <PlayCircle className="mr-2 h-4 w-4" />
+                          Iniciar Producción
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Iniciar producción?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            La orden pasará a <strong>En Progreso</strong>. Ya no
+                            podrás agregar ni quitar ítems.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleStartProduction}>
+                            Confirmar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
 
-              {/* Cancelar orden */}
-              <Button
-                variant="outline"
-                className="text-destructive hover:text-destructive"
-                disabled={isPending}
-                onClick={() => setCancelDialogOpen(true)}
-              >
-                <XCircle className="mr-2 h-4 w-4" />
-                Cancelar
-              </Button>
-            </div>
+                  {/* Cancelar orden */}
+                  {canCancelOrder && (
+                    <Button
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      disabled={isPending}
+                      onClick={() => setCancelDialogOpen(true)}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
 
@@ -719,25 +734,31 @@ export function OrderSheet({
             </div>
 
             {/* Actions */}
-            <div className="mt-4 flex gap-2">
-              <Button
-                className="flex-1"
-                disabled={isPending}
-                onClick={handleReceiveItems}
-              >
-                <PackageCheck className="mr-2 h-4 w-4" />
-                {isPending ? "Registrando..." : "Registrar Recepción"}
-              </Button>
-              <Button
-                variant="outline"
-                className="text-destructive hover:text-destructive"
-                disabled={isPending}
-                onClick={() => setCancelDialogOpen(true)}
-              >
-                <XCircle className="mr-2 h-4 w-4" />
-                Cancelar
-              </Button>
-            </div>
+            {(canReceive || canCancelOrder) && (
+              <div className="mt-4 flex gap-2">
+                {canReceive && (
+                  <Button
+                    className="flex-1"
+                    disabled={isPending}
+                    onClick={handleReceiveItems}
+                  >
+                    <PackageCheck className="mr-2 h-4 w-4" />
+                    {isPending ? "Registrando..." : "Registrar Recepción"}
+                  </Button>
+                )}
+                {canCancelOrder && (
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    disabled={isPending}
+                    onClick={() => setCancelDialogOpen(true)}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -857,10 +878,93 @@ export function OrderSheet({
         {/* CANCEL DIALOG (shared across pending / in_progress phases)           */}
         {/* ------------------------------------------------------------------ */}
         <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>¿Cancelar orden?</DialogTitle>
             </DialogHeader>
+
+            {/* Partial reception breakdown — only shown when IN_PROGRESS with receptions */}
+            {currentOrder && currentOrder.status === "IN_PROGRESS" && (() => {
+              const totalReceived = currentOrder.items.reduce(
+                (sum, i) => sum + i.quantity_received,
+                0,
+              );
+              const totalOrdered = currentOrder.items.reduce(
+                (sum, i) => sum + i.quantity_ordered,
+                0,
+              );
+              const totalPending = totalOrdered - totalReceived;
+              const hasReceptions = totalReceived > 0;
+
+              return (
+                <div className="space-y-3">
+                  {/* Per-item breakdown table */}
+                  <div className="rounded-lg border text-sm divide-y">
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 bg-muted/40">
+                      <span className="text-xs font-medium text-muted-foreground">Ítem</span>
+                      <span className="text-xs font-medium text-muted-foreground text-right">Pedido</span>
+                      <span className="text-xs font-medium text-muted-foreground text-right">Recibido</span>
+                      <span className="text-xs font-medium text-muted-foreground text-right">A cancelar</span>
+                    </div>
+                    {currentOrder.items.map((item) => {
+                      const pending = item.quantity_ordered - item.quantity_received;
+                      return (
+                        <div
+                          key={item.id}
+                          className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 items-center"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium truncate text-xs">
+                              {item.product_variant.product.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {variantLabel(item.product_variant)}
+                            </p>
+                          </div>
+                          <span className="text-right text-xs">{item.quantity_ordered}</span>
+                          <span className="text-right text-xs text-green-600 font-medium">
+                            {item.quantity_received}
+                          </span>
+                          <span className={`text-right text-xs font-medium ${pending > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                            {pending}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {/* Totals row */}
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 bg-muted/40 font-medium text-xs">
+                      <span>Total</span>
+                      <span className="text-right">{totalOrdered}</span>
+                      <span className="text-right text-green-600">{totalReceived}</span>
+                      <span className={`text-right ${totalPending > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                        {totalPending}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Warning when there are received items */}
+                  {hasReceptions && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm">
+                      <p className="font-medium text-amber-800 dark:text-amber-200">
+                        Esta orden tiene recepciones parciales
+                      </p>
+                      <p className="mt-1 text-amber-700 dark:text-amber-300 text-xs">
+                        Los ítems ya recibidos ({totalReceived} unidades) permanecerán en el inventario.
+                        Solo se cancelará lo pendiente ({totalPending} unidades).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Simple confirmation message for PENDING orders (no receptions) */}
+            {currentOrder && currentOrder.status === "PENDING" && (
+              <p className="text-sm text-muted-foreground">
+                ¿Está seguro de cancelar esta orden? Esta acción no se puede deshacer.
+              </p>
+            )}
+
             <div className="space-y-1.5">
               <Label>
                 Motivo de cancelación{" "}

@@ -18,7 +18,10 @@ import {
   MOVEMENT_STATUS_LABELS,
   RECIPIENT_TYPE_LABELS,
   enumToOptions,
+  can,
+  PERMISSIONS,
 } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 import {
   Sheet,
   SheetContent,
@@ -57,7 +60,7 @@ import {
   DialogFooter,
   useToast,
 } from "@upds/ui";
-import { Plus, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Trash2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import {
   createMovementAction,
   addMovementItemAction,
@@ -137,6 +140,7 @@ interface MovementSheetProps {
   recipients: RecipientData[];
   departments: DepartmentData[];
   orders: ManufactureOrderData[];
+  userRole: UserRole;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +155,7 @@ export function MovementSheet({
   recipients,
   departments,
   orders,
+  userRole,
 }: MovementSheetProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -176,6 +181,9 @@ export function MovementSheet({
     : currentMovement.status === "DRAFT"
       ? "draft"
       : "view";
+
+  const canConfirm = can(userRole, PERMISSIONS.MOVEMENT_CONFIRM);
+  const canCancel = can(userRole, PERMISSIONS.MOVEMENT_CANCEL);
 
   // -------------------------------------------------------------------------
   // Confirm / Cancel handlers
@@ -267,6 +275,8 @@ export function MovementSheet({
               toast={toast}
               onConfirm={handleConfirm}
               onCancelClick={() => setCancelDialogOpen(true)}
+              canConfirm={canConfirm}
+              canCancel={canCancel}
             />
           )}
 
@@ -579,6 +589,23 @@ interface DraftPhaseProps {
   toast: (opts: any) => void;
   onConfirm: () => void;
   onCancelClick: () => void;
+  canConfirm: boolean;
+  canCancel: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Stock validation helpers
+// ---------------------------------------------------------------------------
+
+type StockStatus = "ok" | "warning" | "error" | null;
+
+function getStockStatus(movementType: string, qty: number, stock: number): StockStatus {
+  // ENTRY and ADJUSTMENT don't consume stock in the same direction
+  if (movementType === "ENTRY" || movementType === "ADJUSTMENT") return null;
+  if (qty <= 0) return null;
+  if (qty > stock) return "error";
+  if (qty > stock * 0.8) return "warning";
+  return "ok";
 }
 
 function DraftPhase({
@@ -590,6 +617,8 @@ function DraftPhase({
   toast,
   onConfirm,
   onCancelClick,
+  canConfirm,
+  canCancel,
 }: DraftPhaseProps) {
   const isSale = movement.movement_type === "SALE";
   const isAdjustment = movement.movement_type === "ADJUSTMENT";
@@ -609,6 +638,16 @@ function DraftPhase({
 
   const selectedProduct = availableProducts.find((p) => p.id === selectedProductId);
   const availableVariants = selectedProduct?.variants.filter((v) => v.is_active) ?? [];
+  const selectedVariant = availableVariants.find((v) => v.id === selectedVariantId);
+
+  // Stock validation (only for outgoing movements)
+  const parsedQty = Number(quantity);
+  const variantStock = selectedVariant?.current_stock ?? 0;
+  const stockStatus = selectedVariantId
+    ? getStockStatus(movement.movement_type, parsedQty, variantStock)
+    : null;
+  const remainingAfter = variantStock - parsedQty;
+  const isStockBlocked = stockStatus === "error";
 
   function resetAddForm() {
     setSelectedProductId("");
@@ -627,6 +666,10 @@ function DraftPhase({
     if (isNaN(qty) || qty === 0) { setAddError("La cantidad no puede ser 0."); return; }
     if (!isAdjustment && qty < 1) { setAddError("La cantidad debe ser mayor a 0."); return; }
     if (isSale && price <= 0) { setAddError("El precio debe ser mayor a 0 para ventas."); return; }
+    if (isStockBlocked) {
+      setAddError(`La cantidad excede el stock disponible (${variantStock} unidades).`);
+      return;
+    }
 
     startTransition(async () => {
       const result = await addMovementItemAction({
@@ -850,6 +893,40 @@ function DraftPhase({
           )}
         </div>
 
+        {/* Stock feedback — only for outgoing movement types */}
+        {selectedVariantId && stockStatus !== null && (
+          <div className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+            stockStatus === "error"
+              ? "bg-destructive/10 text-destructive"
+              : stockStatus === "warning"
+                ? "bg-amber-50 text-amber-800 border border-amber-200"
+                : "text-muted-foreground"
+          }`}>
+            {stockStatus === "error" && (
+              <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            )}
+            {stockStatus === "warning" && (
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+            )}
+            <span>
+              {stockStatus === "error" && (
+                <>La cantidad excede el stock disponible ({variantStock} unidades).</>
+              )}
+              {stockStatus === "warning" && (
+                <>Atención: quedarán solo {remainingAfter} unidades en stock.</>
+              )}
+              {stockStatus === "ok" && (
+                <>Stock disponible: {variantStock} unidades.</>
+              )}
+            </span>
+          </div>
+        )}
+        {selectedVariantId && stockStatus === null && selectedVariant !== undefined && !isAdjustment && (
+          <p className="text-xs text-muted-foreground">
+            Stock disponible: {variantStock} unidades.
+          </p>
+        )}
+
         {addError && (
           <p className="text-xs text-destructive">{addError}</p>
         )}
@@ -858,7 +935,7 @@ function DraftPhase({
           type="button"
           size="sm"
           onClick={handleAddItem}
-          disabled={isPending || !selectedVariantId}
+          disabled={isPending || !selectedVariantId || isStockBlocked}
         >
           <Plus className="mr-1 h-4 w-4" />
           Agregar
@@ -866,50 +943,56 @@ function DraftPhase({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3 pt-2">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              className="flex-1"
-              disabled={isPending || movement.items.length === 0}
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Confirmar Movimiento
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Confirmar movimiento?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción es <strong>irreversible</strong>. El stock de{" "}
-                {movement.items.length} variante{movement.items.length !== 1 ? "s" : ""} será
-                actualizado inmediatamente.
-                {isSale && (
-                  <span className="block mt-1">
-                    Total a cobrar: <strong>{formatAmount(movement.total_amount)}</strong>
-                  </span>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Revisar</AlertDialogCancel>
-              <AlertDialogAction onClick={onConfirm}>
-                Confirmar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      {(canConfirm || canCancel) && (
+        <div className="flex gap-3 pt-2">
+          {canConfirm && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  className="flex-1"
+                  disabled={isPending || movement.items.length === 0}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Confirmar Movimiento
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Confirmar movimiento?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción es <strong>irreversible</strong>. El stock de{" "}
+                    {movement.items.length} variante{movement.items.length !== 1 ? "s" : ""} será
+                    actualizado inmediatamente.
+                    {isSale && (
+                      <span className="block mt-1">
+                        Total a cobrar: <strong>{formatAmount(movement.total_amount)}</strong>
+                      </span>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Revisar</AlertDialogCancel>
+                  <AlertDialogAction onClick={onConfirm}>
+                    Confirmar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
-        <Button
-          variant="outline"
-          className="text-destructive border-destructive/50 hover:bg-destructive/10"
-          disabled={isPending}
-          onClick={onCancelClick}
-        >
-          <XCircle className="mr-2 h-4 w-4" />
-          Cancelar
-        </Button>
-      </div>
+          {canCancel && (
+            <Button
+              variant="outline"
+              className="text-destructive border-destructive/50 hover:bg-destructive/10"
+              disabled={isPending}
+              onClick={onCancelClick}
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              Cancelar
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

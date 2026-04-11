@@ -11,12 +11,21 @@ import {
   Users,
   ArrowLeftRight,
   ClipboardList,
-  UserCog,
   Menu,
   LogOut,
+  BarChart3,
+  DollarSign,
+  Boxes,
+  ScrollText,
+  Gift,
+  Briefcase,
+  Trash2,
+  UserCircle,
 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { logoutAction } from "@/actions/auth";
+import { can, PERMISSIONS } from "@upds/validators";
+import type { UserRole } from "@upds/validators";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,26 +33,32 @@ import { logoutAction } from "@/actions/auth";
 
 interface SidebarProps {
   userName: string;
-  userRole: string;
+  userRole: UserRole;
 }
 
 // ---------------------------------------------------------------------------
-// Nav items
+// Nav items (with optional required permission)
 // ---------------------------------------------------------------------------
 
 const mainNav = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Productos", href: "/productos", icon: Package },
-  { label: "Departamentos", href: "/departamentos", icon: Building2 },
-  { label: "Fabricantes", href: "/fabricantes", icon: Factory },
-  { label: "Destinatarios", href: "/destinatarios", icon: Users },
-  { label: "Movimientos", href: "/movimientos", icon: ArrowLeftRight },
-  { label: "Ordenes de Fabricacion", href: "/ordenes", icon: ClipboardList },
-] as const;
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, permission: null },
+  { label: "Productos", href: "/productos", icon: Package, permission: PERMISSIONS.PRODUCT_VIEW },
+  { label: "Departamentos", href: "/departamentos", icon: Building2, permission: PERMISSIONS.CATALOG_VIEW },
+  { label: "Fabricantes", href: "/fabricantes", icon: Factory, permission: PERMISSIONS.CATALOG_VIEW },
+  { label: "Destinatarios", href: "/destinatarios", icon: Users, permission: PERMISSIONS.CATALOG_VIEW },
+  { label: "Movimientos", href: "/movimientos", icon: ArrowLeftRight, permission: PERMISSIONS.MOVEMENT_VIEW },
+  { label: "Ordenes de Fabricacion", href: "/ordenes", icon: ClipboardList, permission: PERMISSIONS.MANUFACTURE_ORDER_VIEW },
+];
 
-const bottomNav = [
-  { label: "Usuarios", href: "/usuarios", icon: UserCog },
-] as const;
+const reportesNav = [
+  { label: "Reportes", href: "/reportes", icon: BarChart3, permission: null },
+  { label: "Financiero", href: "/reportes/financiero", icon: DollarSign, permission: PERMISSIONS.REPORT_FINANCIAL },
+  { label: "Inventario", href: "/reportes/inventario", icon: Boxes, permission: PERMISSIONS.REPORT_INVENTORY },
+  { label: "Movimientos", href: "/reportes/movimientos", icon: ScrollText, permission: PERMISSIONS.REPORT_MOVEMENTS },
+  { label: "Dotaciones", href: "/reportes/dotaciones", icon: Gift, permission: PERMISSIONS.REPORT_DONATIONS },
+  { label: "Consumo Departamentos", href: "/reportes/consumo-departamentos", icon: Briefcase, permission: PERMISSIONS.REPORT_CONSUMPTION },
+  { label: "Bajas", href: "/reportes/bajas", icon: Trash2, permission: PERMISSIONS.REPORT_WRITE_OFFS },
+];
 
 // ---------------------------------------------------------------------------
 // NavLink
@@ -93,7 +108,7 @@ function SidebarContent({
 }: {
   pathname: string;
   userName: string;
-  userRole: string;
+  userRole: UserRole;
   onLinkClick?: () => void;
   onLogout?: () => void;
   isLoggingOut?: boolean;
@@ -102,6 +117,14 @@ function SidebarContent({
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
+
+  // Filter nav items by permission
+  const visibleMainNav = mainNav.filter(
+    (item) => item.permission === null || can(userRole, item.permission),
+  );
+  const visibleReportesNav = reportesNav.filter(
+    (item) => item.permission === null || can(userRole, item.permission),
+  );
 
   return (
     <div className="flex h-full flex-col bg-primary text-white">
@@ -114,8 +137,8 @@ function SidebarContent({
       </div>
 
       {/* Main navigation */}
-      <nav className="flex-1 space-y-1 px-3">
-        {mainNav.map((item) => (
+      <nav className="flex-1 overflow-y-auto px-3 space-y-1">
+        {visibleMainNav.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}
@@ -125,35 +148,54 @@ function SidebarContent({
             onClick={onLinkClick}
           />
         ))}
-      </nav>
 
-      {/* Bottom navigation */}
-      <div className="border-t border-white/10 px-3 py-3">
-        {bottomNav.map((item) => (
-          <NavLink
-            key={item.href}
-            href={item.href}
-            icon={item.icon}
-            label={item.label}
-            active={isActive(item.href)}
-            onClick={onLinkClick}
-          />
-        ))}
-      </div>
+        {/* Reportes — only show section if there are visible items */}
+        {visibleReportesNav.length > 0 && (
+          <div className="pt-3">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-white/40">
+              Reportes
+            </p>
+            {visibleReportesNav.map((item) => (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                icon={item.icon}
+                label={item.label}
+                active={isActive(item.href)}
+                onClick={onLinkClick}
+              />
+            ))}
+          </div>
+        )}
+      </nav>
 
       {/* User info + Logout */}
       <div className="border-t border-white/10 px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-semibold shrink-0">
+          <Link
+            href="/perfil"
+            onClick={onLinkClick}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-semibold shrink-0 hover:bg-white/30 transition-colors"
+            title="Mi Perfil"
+          >
             {userName
               .split(" ")
               .map((n) => n[0])
               .join("")
               .slice(0, 2)
               .toUpperCase()}
-          </div>
+          </Link>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{userName}</p>
+            <Link
+              href="/perfil"
+              onClick={onLinkClick}
+              className="flex items-center gap-1 group"
+            >
+              <p className="truncate text-sm font-medium group-hover:text-white/80 transition-colors">
+                {userName}
+              </p>
+              <UserCircle className="h-3.5 w-3.5 text-white/40 group-hover:text-white/70 transition-colors shrink-0" />
+            </Link>
             <p className="truncate text-xs text-white/60">{userRole}</p>
           </div>
           <button

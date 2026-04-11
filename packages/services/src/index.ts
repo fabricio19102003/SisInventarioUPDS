@@ -1,12 +1,25 @@
 // @upds/services — Logica de negocio pura
 
 // Auditoria
-export { createAuditLog, diffValues } from "./audit";
+export {
+  createAuditLog,
+  diffValues,
+  parseForwardedIp,
+  getAuditLogs,
+  getAuditFilterOptions,
+} from "./audit";
 export type {
   DbClient,
   AuditAction,
   AuditEntityType,
+  AuditValue,
+  AuditPayload,
   CreateAuditLogParams,
+  AuditLogFilters,
+  AuditLogUser,
+  AuditLogEntry,
+  PaginatedResult,
+  AuditFilterOptions,
 } from "./audit";
 
 // Auth (usuarios)
@@ -37,9 +50,41 @@ export type {
 } from "./manufacture-order";
 
 // Movimientos de inventario
-export { InventoryMovementService, generateMovementNumber } from "./inventory-movement";
+export {
+  InventoryMovementService,
+  generateMovementNumber,
+} from "./inventory-movement";
 export type { MovementData, MovementItemData } from "./inventory-movement";
 
 // Dashboard / Reportes
 export { DashboardService } from "./dashboard";
-export type { DashboardStats, StockByArea, OrderStatusSummary, RecentMovement, MonthlyMovements } from "./dashboard";
+export type {
+  DashboardStats,
+  StockByArea,
+  OrderStatusSummary,
+  RecentMovement,
+  MonthlyMovements,
+} from "./dashboard";
+
+// Reportes de negocio
+export { ReportsService } from "./reports";
+export type {
+  FinancialReportRow,
+  FinancialReportSummary,
+  FinancialReport,
+  InventoryVariantRow,
+  InventoryProductRow,
+  InventoryReport,
+  MovementReportRow,
+  PaginatedMovementsReport,
+  DonationItemRow,
+  DonationReportRow,
+  DonationReportSummary,
+  DonationsReport,
+  DepartmentConsumptionRow,
+  DepartmentConsumptionReport,
+  WriteOffItemRow,
+  WriteOffReportRow,
+  WriteOffReportSummary,
+  WriteOffsReport,
+} from "./reports";

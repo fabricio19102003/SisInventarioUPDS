@@ -6,3 +6,4 @@ export * from "./departments";
 export * from "./inventory-movements";
 export * from "./manufacture-orders";
 export * from "./dashboard";
+export * from "./reports";

@@ -269,7 +269,16 @@ export class ManufactureOrderService {
 
     const variant = await this.db.productVariant.findUnique({
       where: { id: data.product_variant_id },
-      select: { id: true, is_active: true },
+      select: {
+        id: true,
+        is_active: true,
+        product: {
+          select: {
+            category: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!variant) {
@@ -280,6 +289,14 @@ export class ManufactureOrderService {
       return {
         success: false,
         error: "No se puede agregar una variante desactivada",
+      };
+    }
+
+    // Las ordenes de fabricacion solo pueden contener indumentaria medica
+    if (variant.product.category !== "MEDICAL_GARMENT") {
+      return {
+        success: false,
+        error: `Solo se pueden fabricar productos de indumentaria medica. El producto '${variant.product.name}' es material de oficina.`,
       };
     }
 
@@ -683,11 +700,42 @@ export class ManufactureOrderService {
 
     const order = await this.db.manufactureOrder.findUnique({
       where: { id: data.manufacture_order_id },
-      select: { id: true, status: true, order_number: true },
+      select: {
+        id: true,
+        status: true,
+        order_number: true,
+        items: {
+          select: {
+            id: true,
+            quantity_ordered: true,
+            quantity_received: true,
+            product_variant: {
+              select: {
+                sku_suffix: true,
+                product: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!order) {
       return { success: false, error: "Orden de fabricacion no encontrada" };
+    }
+
+    if (order.status === "CANCELLED") {
+      return {
+        success: false,
+        error: "La orden ya se encuentra cancelada",
+      };
+    }
+
+    if (order.status === "COMPLETED") {
+      return {
+        success: false,
+        error: "No se pueden cancelar ordenes en estado COMPLETADO",
+      };
     }
 
     if (order.status !== "PENDING" && order.status !== "IN_PROGRESS") {
@@ -698,13 +746,45 @@ export class ManufactureOrderService {
       };
     }
 
+    // Compute partial reception breakdown
+    const totalOrdered = order.items.reduce(
+      (sum, i) => sum + i.quantity_ordered,
+      0,
+    );
+    const totalReceived = order.items.reduce(
+      (sum, i) => sum + i.quantity_received,
+      0,
+    );
+    const totalPending = totalOrdered - totalReceived;
+    const hasPartialReceptions = totalReceived > 0;
+
+    // Build enriched cancel reason with breakdown when there are partial receptions
+    let enrichedCancelReason = data.cancel_reason;
+    if (hasPartialReceptions) {
+      const itemBreakdown = order.items
+        .map(
+          (item) =>
+            `  - ${item.product_variant.product.name} (${item.product_variant.sku_suffix ?? "sin variante"}): ` +
+            `pedido=${item.quantity_ordered}, recibido=${item.quantity_received}, ` +
+            `pendiente=${item.quantity_ordered - item.quantity_received}`,
+        )
+        .join("\n");
+
+      enrichedCancelReason =
+        `${data.cancel_reason}\n\n` +
+        `[Cancelacion con recepciones parciales]\n` +
+        `Total pedido: ${totalOrdered} uds | Recibido: ${totalReceived} uds | Cancelado: ${totalPending} uds\n` +
+        `Detalle por item:\n${itemBreakdown}\n` +
+        `Las unidades ya recibidas permanecen en el inventario (movimientos ENTRY confirmados son irreversibles).`;
+    }
+
     const updatedOrder = await this.db.$transaction(
       async (tx: TransactionClient) => {
         const result = await tx.manufactureOrder.update({
           where: { id: order.id },
           data: {
             status: "CANCELLED",
-            cancel_reason: data.cancel_reason,
+            cancel_reason: enrichedCancelReason,
             cancelled_at: new Date(),
           },
           select: ORDER_SELECT,
@@ -719,6 +799,9 @@ export class ManufactureOrderService {
           new_values: {
             status: "CANCELLED",
             cancel_reason: data.cancel_reason,
+            has_partial_receptions: hasPartialReceptions,
+            total_received: totalReceived,
+            total_pending: totalPending,
           },
           ip_address: ctx?.ip_address,
           user_agent: ctx?.user_agent,

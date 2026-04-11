@@ -162,3 +162,34 @@ export type {
   CancelMovementInput,
   MovementFiltersInput,
 } from "./inventory-movement";
+
+// Reportes
+export {
+  dateRangeSchema,
+  financialReportFiltersSchema,
+  inventoryReportFiltersSchema,
+  movementsReportFiltersSchema,
+  donationsReportFiltersSchema,
+  departmentConsumptionFiltersSchema,
+  writeOffsReportFiltersSchema,
+  auditLogFiltersSchema,
+} from "./reports";
+
+export type {
+  DateRangeInput,
+  DateRangeOutput,
+  FinancialReportFiltersInput,
+  FinancialReportFilters,
+  InventoryReportFiltersInput,
+  InventoryReportFilters,
+  MovementsReportFiltersInput,
+  MovementsReportFilters,
+  DonationsReportFiltersInput,
+  DonationsReportFilters,
+  DepartmentConsumptionFiltersInput,
+  DepartmentConsumptionFilters,
+  WriteOffsReportFiltersInput,
+  WriteOffsReportFilters,
+  AuditLogFiltersInput,
+  AuditLogFiltersOutput,
+} from "./reports";

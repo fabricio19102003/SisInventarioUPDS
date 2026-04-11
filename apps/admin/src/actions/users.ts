@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/session";
 import { prisma } from "@upds/db";
 import { AuthService } from "@upds/services";
 import { revalidatePath } from "next/cache";
+import { getAuditContext } from "@/lib/audit-context";
 import type {
   UserFiltersInput,
   CreateUserInput,
@@ -27,9 +28,10 @@ export async function getUser(id: string) {
 
 export async function createUser(data: CreateUserInput) {
   const session = await requirePermission("user:manage");
+  const auditCtx = await getAuditContext();
 
   const service = new AuthService(prisma);
-  const result = await service.createUser(data, session.id);
+  const result = await service.createUser(data, session.id, auditCtx);
 
   if (result.success) {
     revalidatePath("/users");
@@ -40,9 +42,10 @@ export async function createUser(data: CreateUserInput) {
 
 export async function updateUser(data: UpdateUserInput) {
   const session = await requirePermission("user:manage");
+  const auditCtx = await getAuditContext();
 
   const service = new AuthService(prisma);
-  const result = await service.updateUser(data, session.id);
+  const result = await service.updateUser(data, session.id, auditCtx);
 
   if (result.success) {
     revalidatePath("/users");
@@ -54,9 +57,10 @@ export async function updateUser(data: UpdateUserInput) {
 
 export async function deactivateUser(id: string) {
   const session = await requirePermission("user:manage");
+  const auditCtx = await getAuditContext();
 
   const service = new AuthService(prisma);
-  const result = await service.deactivateUser(id, session.id);
+  const result = await service.deactivateUser(id, session.id, auditCtx);
 
   if (result.success) {
     revalidatePath("/users");
@@ -68,9 +72,10 @@ export async function deactivateUser(id: string) {
 
 export async function reactivateUser(id: string) {
   const session = await requirePermission("user:manage");
+  const auditCtx = await getAuditContext();
 
   const service = new AuthService(prisma);
-  const result = await service.reactivateUser(id, session.id);
+  const result = await service.reactivateUser(id, session.id, auditCtx);
 
   if (result.success) {
     revalidatePath("/users");
@@ -82,9 +87,10 @@ export async function reactivateUser(id: string) {
 
 export async function adminResetPassword(data: AdminResetPasswordInput) {
   const session = await requirePermission("user:manage");
+  const auditCtx = await getAuditContext();
 
   const service = new AuthService(prisma);
-  const result = await service.adminResetPassword(data, session.id);
+  const result = await service.adminResetPassword(data, session.id, auditCtx);
 
   if (result.success) {
     revalidatePath(`/users/${data.user_id}`);

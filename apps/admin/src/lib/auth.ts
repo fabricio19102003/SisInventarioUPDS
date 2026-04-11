@@ -1,8 +1,10 @@
 import NextAuth from "next-auth";
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { headers } from "next/headers";
 import { prisma } from "@upds/db";
 import { AuthService } from "@upds/services";
+import { parseForwardedIp } from "@upds/services";
 import { loginSchema } from "@upds/validators";
 import type { UserRole } from "@upds/validators";
 import "./auth.types";
@@ -24,10 +26,22 @@ const authConfig: NextAuthConfig = {
           return null;
         }
 
-        const result = await authService.login({
-          email: parsed.data.email,
-          password: parsed.data.password,
-        });
+        const headersList = await headers();
+        const auditCtx = {
+          ip_address:
+            parseForwardedIp(headersList.get("x-forwarded-for")) ??
+            headersList.get("x-real-ip") ??
+            null,
+          user_agent: headersList.get("user-agent") ?? null,
+        };
+
+        const result = await authService.login(
+          {
+            email: parsed.data.email,
+            password: parsed.data.password,
+          },
+          auditCtx,
+        );
 
         if (!result.success) {
           return null;
